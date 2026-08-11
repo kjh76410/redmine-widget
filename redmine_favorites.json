@@ -1,0 +1,37 @@
+[
+  {
+    "id": 170,
+    "name": "LM75 재난망 (A, D) ",
+    "url": "http://10.1.100.150/redmine/projects/lm75-a-d/issues"
+  },
+  {
+    "id": 80,
+    "name": "재난안전통신망",
+    "url": "http://10.1.100.150/redmine/projects/pslte/issues"
+  },
+  {
+    "id": 147,
+    "name": "MCPTT",
+    "url": "http://10.1.100.150/redmine/projects/mcx-in-mcptt/issues"
+  },
+  {
+    "id": 277,
+    "name": "LM75EDC",
+    "url": "http://10.1.100.150/redmine/projects/lm75edc/issues"
+  },
+  {
+    "id": 307,
+    "name": "DANTE",
+    "url": "http://10.1.100.150/redmine/projects/dante/issues"
+  },
+  {
+    "id": 173,
+    "name": "LM75D_PS",
+    "url": "http://10.1.100.150/redmine/projects/lm75d_ps/issues"
+  },
+  {
+    "id": 172,
+    "name": "CASPER",
+    "url": "http://10.1.100.150/redmine/projects/casper/issues"
+  }
+]
