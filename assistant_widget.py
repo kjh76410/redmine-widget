@@ -22,7 +22,7 @@ from pathlib import Path
 
 import tkinter as tk
 import tkinter.font as tkfont
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 import webbrowser
 
 
@@ -42,9 +42,9 @@ def open_url(url):
 # ─────────────────────────────────────────────
 LINKS = [
     ("전사 레드마인",    "http://10.1.100.150/redmine/issues", "🏢"),
-    ("팀 레드마인",      "http://10.1.100.20/projects",  "👥"),
-    ("TMS (Cybertel)",  "http://10.1.100.80/main",              "🖥️"),
 ]
+
+TEAM_REDMINE_URL = "http://10.1.100.20/projects"  # 팀 레드마인 (전사 레드마인과 별도 서버, 프로젝트 트리 API 없이 링크만 이동)
 
 # ─────────────────────────────────────────────
 # 브라우저 선택
@@ -67,6 +67,24 @@ ICON_RADIUS = 10          # 아이콘 배경 둥근 네모의 모서리 반경(p
 ICON_GLYPH_PAD = 10       # 아이콘 배경 안쪽에서 실제 그림이 차지하는 여백(px, 사방 동일)
 MARGIN      = 20          # 화면 가장자리로부터의 여백(px)
 
+# 메인 아이콘 옆에 뜨는 퀵 툴바(내 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 / 버전별 해결 일감 원형 아이콘 5개) 설정
+QUICK_TOOLBAR_ICON_SIZE  = 52   # 아이콘 배경(둥근 네모) 한 변 크기(px)
+QUICK_TOOLBAR_RADIUS     = 12   # 아이콘 배경 둥근 네모의 모서리 반경(px) - 메인 아이콘과 비슷한 느낌
+QUICK_TOOLBAR_GLYPH_PAD  = 9    # 배경 안쪽에서 실제 그림이 차지하는 여백(px, 사방 동일) - 메인 아이콘과 비슷한 비율
+QUICK_TOOLBAR_GAP        = 10   # 아이콘 사이 간격(px)
+QUICK_TOOLBAR_MARGIN     = 10   # 메인 아이콘과 퀵 툴바 사이 가로 간격(px)
+QUICK_TOOLBAR_BUTTON_COUNT = 5  # 아이콘 개수(내 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 / 버전별 해결 일감)
+QUICK_TOOLBAR_TOTAL_W = (
+    QUICK_TOOLBAR_ICON_SIZE * QUICK_TOOLBAR_BUTTON_COUNT
+    + QUICK_TOOLBAR_GAP * (QUICK_TOOLBAR_BUTTON_COUNT - 1)
+)  # 퀵 툴바 전체 너비(px) - 플라이아웃을 그 오른쪽에 이어 붙이는 데 사용
+MY_ICON_FILE       = Path(__file__).parent / "assets" / "icons" / "my.png"
+BOOKMARK_ICON_FILE = Path(__file__).parent / "assets" / "icons" / "bookmark.png"
+FOLDER_ICON_FILE   = Path(__file__).parent / "assets" / "icons" / "folder.png"
+WINDOW_ICON_FILE   = Path(__file__).parent / "assets" / "icons" / "window.png"
+SEARCH_ICON_FILE   = Path(__file__).parent / "assets" / "icons" / "search.png"
+SEARCH_ICON_SIZE   = 14  # 검색 버튼 안 돋보기 아이콘 크기(px)
+
 # 폰트 파일 하나만 설치 없이 이 프로세스에서만 쓰도록 등록해서 쓴다.
 # Pretendard-Regular.otf는 CFF(PostScript) 외곽선 방식이라 윈도우 GDI 텍스트 렌더러와
 # 궁합이 안 좋아 글자가 얇아지거나 깨져 보였다. NotoSansKR-Regular.ttf는 GDI가 안정적으로
@@ -84,15 +102,14 @@ BADGE_HOVER  = "#313F63"  # 뱃지 호버 배경색 (포인트 컬러 톤이 살
 BADGE_SELECTED_BG = BG_COLOR   # 펼쳐져서 선택된(depth 진입한) 뱃지 배경색 = 포인트 컬러
 BADGE_SELECTED_FG = "#FFFFFF"  # 선택된 뱃지 글자색
 BADGE_RADIUS = 15         # 뱃지 모서리 둥근 정도(px)
-BADGE_H      = 42         # 뱃지 높이(px)
 SUB_BADGE_H  = 38         # 플라이아웃(하위 프로젝트) 뱃지 높이(px)
 SHADOW_COLOR = "#061431"  # 카드 아래에 깔리는 그림자색 (어두운 배경이라 더 어둡게)
 SHADOW_OFFSET = 3         # 그림자 오프셋(px)
 PANEL_BG    = ICON_BUTTON_BG   # 패널 배경색 - 메인 아이콘과 같은 남색
-PANEL_W     = 220         # 메인 패널 너비(px)
-FLYOUT_W    = 200         # 플라이아웃 패널 너비(px)
+FLYOUT_W    = 300         # 플라이아웃 패널 너비(px, 전사 프로젝트/즐겨찾기 공용)
 MY_ISSUES_FLYOUT_W = 460  # "내 일감" 플라이아웃 너비(px) - 이슈 제목이 길어서 더 넓게
 PANEL_GAP   = 6           # 패널/플라이아웃 사이 가로 간격(px)
+WIDGET_WINDOW_H = 760     # "내 일감"/"즐겨찾기 프로젝트" 창 높이 - 전사 프로젝트 플라이아웃도 높이를 여기에 맞춤
 GO_ZONE_W   = 26          # 하위 항목이 있는 뱃지 오른쪽 끝의 "바로 이동" 버튼 클릭 영역 너비(px)
 GO_ICON_SIZE = 16         # "바로 이동" 버튼 아이콘 크기(px)
 GO_ICON_FILE = Path(__file__).parent / "assets" / "icons" / "go.png"
@@ -110,9 +127,6 @@ TOAST_ICON_SIZE = 20       # 토스트 왼쪽에 표시할 알람 아이콘(흰�
 TOAST_ICON_FILE = Path(__file__).parent / "assets" / "icons" / "alarm.png"
 TOAST_CHIP_SIZE = 34       # 알람 아이콘 뒤 포인트 컬러 배지(둥근 네모) 크기(px)
 TOAST_CHIP_RADIUS = 10     # 알람 아이콘 뒤 배지의 모서리 반경(px)
-
-# 우클릭 메뉴로 추가한 링크가 저장되는 파일 (앱을 다시 실행해도 유지됨)
-CUSTOM_LINKS_FILE = Path(__file__).parent / "custom_links.json"
 
 # 레드마인 프로젝트 뱃지를 우클릭해 즐겨찾기한 목록이 저장되는 파일 (앱을 다시 실행해도 유지됨)
 FAVORITES_FILE = Path(__file__).parent / "redmine_favorites.json"
@@ -339,9 +353,57 @@ def fetch_project_issue_list(project_id):
             "issue_id": i.get("id"),
             "title": i.get("subject", ""),
             "url": f"{REDMINE_BASE_URL}/issues/{i.get('id')}",
+            "tracker": i.get("tracker", {}).get("name", ""),
         }
         for i in data.get("issues", [])
     ]
+
+
+def fetch_resolved_issues_by_version(project_id):
+    """레드마인 REST API로 특정 프로젝트의 종료성 상태(해결/종료/거부 등, status_id=closed)
+    이슈를 가져와 배포 버전별로 묶어 반환한다. 상태 기준은 나중에 조정될 수 있음
+    (우선 레이아웃 확인용). 실패/미설정 시 빈 리스트를 반환.
+    반환 형식: [{"version": str, "issues": [{"id":, "subject":, "url":}, ...]}, ...]"""
+    api_key = load_redmine_api_key()
+    if not api_key:
+        return []
+
+    issues = []
+    offset = 0
+    limit = 100
+    max_issues = 300
+    while offset < max_issues:
+        url = (
+            f"{REDMINE_BASE_URL}/issues.json"
+            f"?project_id={project_id}&status_id=closed&sort=updated_on:desc&limit={limit}&offset={offset}"
+        )
+        req = urllib.request.Request(url, headers={"X-Redmine-API-Key": api_key})
+        try:
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.load(resp)
+        except (urllib.error.URLError, OSError, ValueError):
+            break
+
+        batch = data.get("issues", [])
+        issues.extend(batch)
+        offset += limit
+        if not batch or offset >= data.get("total_count", 0):
+            break
+
+    groups = {}
+    order = []
+    for i in issues:
+        version_name = i.get("fixed_version", {}).get("name") or "버전 미지정"
+        if version_name not in groups:
+            groups[version_name] = []
+            order.append(version_name)
+        groups[version_name].append({
+            "id": i.get("id"),
+            "subject": i.get("subject", ""),
+            "url": f"{REDMINE_BASE_URL}/issues/{i.get('id')}",
+        })
+
+    return [{"version": version_name, "issues": groups[version_name]} for version_name in order]
 
 
 def search_project_issues(project_id, query):
@@ -383,36 +445,19 @@ def search_project_issues(project_id, query):
 
 def build_project_tree(projects):
     """평면 프로젝트 리스트를 parent_id 기준으로 최상위→하위 트리로 묶는다.
-    각 레벨은 이름 기준 내림차순으로 정렬한다."""
+    각 레벨은 이름 기준 오름차순으로 정렬한다."""
     by_parent = {}
     for p in projects:
         by_parent.setdefault(p["parent_id"], []).append(p)
 
     def attach(node):
-        node["children"] = sorted(
-            by_parent.get(node["id"], []), key=lambda n: n["name"], reverse=True
-        )
+        node["children"] = sorted(by_parent.get(node["id"], []), key=lambda n: n["name"])
         for child in node["children"]:
             attach(child)
         return node
 
-    roots = sorted(by_parent.get(None, []), key=lambda n: n["name"], reverse=True)
+    roots = sorted(by_parent.get(None, []), key=lambda n: n["name"])
     return [attach(root) for root in roots]
-
-
-def load_custom_links():
-    if not CUSTOM_LINKS_FILE.exists():
-        return []
-    try:
-        with open(CUSTOM_LINKS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return []
-
-
-def save_custom_links(custom_links):
-    with open(CUSTOM_LINKS_FILE, "w", encoding="utf-8") as f:
-        json.dump(custom_links, f, ensure_ascii=False, indent=2)
 
 
 def load_favorites():
@@ -606,13 +651,10 @@ class AssistantWidget:
         self.sw = self.root.winfo_screenwidth()
         self.sh = self.root.winfo_screenheight()
 
-        self.panel = None      # 뱃지 패널 (열려 있을 때만 존재)
-        self.panel_open = False
+        self.panel_open = False  # 퀵 툴바(+플라이아웃)가 열려 있는 상태인지
         self.flyouts = []       # 레드마인 하위 프로젝트 플라이아웃 스택 (depth 순서, 열려 있을 때만 존재)
-        self.active_main_badge = None    # 메인 패널에서 현재 펼쳐져 있는(depth 0을 연) 뱃지의 (canvas, render)
         self.active_flyout_badge = {}    # depth -> 그 플라이아웃에서 현재 펼쳐져 있는(depth+1을 연) 뱃지의 (canvas, render)
 
-        self.custom_links = load_custom_links()  # 우클릭으로 추가한 링크 (영구 저장됨)
         self.favorites = load_favorites()  # 레드마인 프로젝트 뱃지를 우클릭해 즐겨찾기한 목록 (영구 저장됨)
         self.favorite_issues = {}  # 즐겨찾기 프로젝트id(str) -> 그 프로젝트의 열려있는 이슈 목록 (백그라운드로 채워짐)
         self._favorite_issues_queue = queue.Queue()  # 백그라운드 스레드 → 메인 스레드로 결과 전달
@@ -630,6 +672,19 @@ class AssistantWidget:
         self.toast_icon = load_toast_icon()  # 참조 유지(GC 방지)
         self.go_icon = load_go_icon()  # 뱃지 "바로 이동" 버튼 아이콘, 참조 유지(GC 방지)
 
+        # 퀵 툴바(내 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 / 버전별 해결 일감) 원형 아이콘, 참조 유지(GC 방지)
+        quick_glyph_size = QUICK_TOOLBAR_ICON_SIZE - QUICK_TOOLBAR_GLYPH_PAD * 2
+        self.quick_my_icon = load_icon_glyph(MY_ICON_FILE, quick_glyph_size, "#FFFFFF")
+        self.quick_bookmark_icon = load_icon_glyph(BOOKMARK_ICON_FILE, quick_glyph_size, "#FFFFFF")
+        self.quick_folder_icon = load_icon_glyph(FOLDER_ICON_FILE, quick_glyph_size, "#FFFFFF")
+        self.quick_window_icon = load_icon_glyph(WINDOW_ICON_FILE, quick_glyph_size, "#FFFFFF")
+        self.search_icon = load_icon_glyph(SEARCH_ICON_FILE, SEARCH_ICON_SIZE, "#FFFFFF")  # 검색 버튼 아이콘, 참조 유지(GC 방지)
+        self.quick_toolbar = None  # 패널이 열려 있을 때만 존재하는 Toplevel
+
+        self.resolved_by_version_win = None  # "버전별 해결 일감" 창 (열려 있을 때만 존재)
+        self.my_issues_win = None    # "내 일감" 창 (열려 있을 때만 존재)
+        self.favorites_win = None    # "즐겨찾기 프로젝트" 창 (열려 있을 때만 존재)
+
         self._build_icon()
         self._poll_redmine_queue()
         self.refresh_redmine_projects()
@@ -639,43 +694,6 @@ class AssistantWidget:
         self.refresh_favorite_project_issues()
         self._poll_notify_queue()
         self._notify_tick()
-
-    # ── 즐겨찾기 + 기본 링크 + 사용자 추가 링크를 합친 전체 목록 ──
-    #    "전사 레드마인"에는 레드마인 최상위 프로젝트 트리가, "⭐ 즐겨찾기"에는
-    #    즐겨찾기한 프로젝트 목록이 children으로 붙어서, 클릭하면 오른쪽 플라이아웃으로 펼쳐진다.
-    def _all_links(self):
-        links = []
-        my_issue_nodes = [
-            {
-                "name": issue["title"], "url": issue["url"], "children": None,
-                "issue_id": issue["issue_id"],
-            }
-            for issue in self.my_issues
-        ]
-        links.append({
-            "name": "📋 내 일감", "url": f"{REDMINE_BASE_URL}/my/page", "children": my_issue_nodes,
-            "my_issues": True, "flyout_width": MY_ISSUES_FLYOUT_W, "count": len(self.my_issues),
-        })
-        if self.favorites:
-            favorite_nodes = [
-                {
-                    "name": f["name"], "url": f["url"], "id": f["id"],
-                    "children": [
-                        {"name": issue["title"], "url": issue["url"], "issue_id": issue["issue_id"]}
-                        for issue in self.favorite_issues.get(str(f["id"]), [])
-                    ],
-                }
-                for f in self.favorites
-            ]
-            links.append({"name": "⭐ 즐겨찾기", "url": None, "children": favorite_nodes})
-        for name, url, _emoji in LINKS:
-            children = self.redmine_tree if name == "전사 레드마인" else None
-            links.append({"name": name, "url": url, "children": children})
-        links += [
-            {"name": item["name"], "url": item["url"], "children": None, "removable": True}
-            for item in self.custom_links
-        ]
-        return links
 
     # ── 레드마인 프로젝트 목록 백그라운드 조회 ──
     #    (tkinter는 다른 스레드에서 직접 건드릴 수 없으므로 Queue로 결과만 전달받는다)
@@ -913,57 +931,9 @@ class AssistantWidget:
     # ── 아이콘 우클릭 메뉴 ─────────────────────
     def show_context_menu(self, event):
         menu = tk.Menu(self.icon, tearoff=0)
-        menu.add_command(label="링크 추가", command=self.open_add_link_dialog)
         menu.add_command(label="레드마인 프로젝트 새로고침", command=self.refresh_redmine_projects)
         menu.add_command(label="내 일감 새로고침", command=self.refresh_my_issues)
         menu.tk_popup(event.x_root, event.y_root)
-
-    # ── 링크 추가 다이얼로그 ───────────────────
-    def open_add_link_dialog(self):
-        dialog = tk.Toplevel(self.root)
-        dialog.title("링크 추가")
-        dialog.resizable(False, False)
-        dialog.attributes("-topmost", True)
-        dialog.configure(bg=PANEL_BG)
-
-        pad = {"padx": 12, "pady": (10, 0)}
-
-        tk.Label(dialog, text="이름", bg=PANEL_BG, fg=BADGE_FG,
-                 font=(FONT_FAMILY, 9), anchor="w").pack(fill="x", **pad)
-        name_entry = tk.Entry(dialog, font=(FONT_FAMILY, 10))
-        name_entry.pack(fill="x", padx=12, pady=(2, 0))
-
-        tk.Label(dialog, text="URL", bg=PANEL_BG, fg=BADGE_FG,
-                 font=(FONT_FAMILY, 9), anchor="w").pack(fill="x", **pad)
-        url_entry = tk.Entry(dialog, font=(FONT_FAMILY, 10))
-        url_entry.pack(fill="x", padx=12, pady=(2, 0))
-
-        def submit():
-            name = name_entry.get().strip()
-            url = url_entry.get().strip()
-            if not name or not url:
-                messagebox.showwarning("입력 필요", "이름과 URL을 모두 입력해 주세요.", parent=dialog)
-                return
-            self.add_link(name, url)
-            dialog.destroy()
-
-        btn_row = tk.Frame(dialog, bg=PANEL_BG)
-        btn_row.pack(fill="x", padx=12, pady=12)
-        tk.Button(btn_row, text="추가", command=submit).pack(side="right")
-        tk.Button(btn_row, text="취소", command=dialog.destroy).pack(side="right", padx=(0, 6))
-
-        name_entry.focus_set()
-        dialog.bind("<Return>", lambda e: submit())
-
-        # 아이콘 근처에 다이얼로그 배치
-        dialog.geometry(f"+{self.icon_x}+{max(self.icon_y - 140, 0)}")
-
-    def add_link(self, name, url):
-        self.custom_links.append({"name": name, "url": url})
-        save_custom_links(self.custom_links)
-        if self.panel_open:
-            self.close_panel()
-            self.open_panel()
 
     # ── "내 일감" 조회용 레드마인 사용자 ID 설정 다이얼로그 ──
     def open_set_user_id_dialog(self):
@@ -1016,149 +986,722 @@ class AssistantWidget:
             self.open_panel()
 
     def open_panel(self):
-        self.panel = tk.Toplevel(self.root)
-        self.panel.overrideredirect(True)
-        self.panel.attributes("-topmost", True)
-        self.panel.configure(bg=PANEL_BG)
-
-        links = self._all_links()
-        pad = 12  # 뱃지 안쪽 텍스트 여백(12px)과 맞춰서, 패널 바깥 여백도 위/아래/좌/우 전부 12px로 통일
-
-        title = tk.Label(
-            self.panel, text="바로가기", bg=PANEL_BG, fg=BADGE_FG_MUTED,
-            font=(FONT_FAMILY, 9, "bold"), anchor="w",
-        )
-        title.pack(fill="x", padx=pad, pady=(pad, 4))
-
-        badge_w = PANEL_W - pad * 2
-        for entry in links:
-            self._make_badge(entry, badge_w, pad)
-
-        # 타이틀 + 뱃지들이 실제로 차지하는 높이에 맞춰 창 크기를 정한다.
-        # (직접 계산한 높이를 쓰면 폰트/여백 차이로 맨 아래 카드가 잘릴 수 있음)
-        self.panel.update_idletasks()
-        panel_h = self.panel.winfo_reqheight() + pad
-
-        # 아이콘 바로 위에 패널 배치 (아래쪽 기준선에 맞춰 위로 쌓임)
-        px = self.icon_x
-        py = self.icon_y - panel_h - 8
-        self.panel.geometry(f"{PANEL_W}x{panel_h}+{px}+{py}")
-
         self.panel_open = True
+        self._build_quick_toolbar()
 
     def close_panel(self):
         self.close_all_flyouts()
-        if self.panel is not None:
-            self.panel.destroy()
-            self.panel = None
         self.panel_open = False
-        self.active_main_badge = None  # 패널이 통째로 사라지므로 canvas 참조도 함께 정리
+        self._close_quick_toolbar()
 
-    # ── 링크 뱃지 하나 만들기 (둥근 필 형태) ───
-    #    entry["children"]가 있으면(=전사 레드마인) 클릭 시 오른쪽 플라이아웃으로 펼쳐짐
-    def _make_badge(self, entry, badge_w, pad):
-        name, url, children = entry["name"], entry["url"], entry["children"]
-        has_children = children is not None
-        has_go_button = has_children and bool(url)
+    # ── 메인 아이콘 옆 퀵 툴바 (내 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 원형 아이콘) ──
+    #    패널이 열려 있는 동안만 함께 떠 있다가, 패널이 닫히면 같이 사라진다.
+    def _build_quick_toolbar(self):
+        self._close_quick_toolbar()
 
-        badge_font = (FONT_FAMILY, 10, "bold")
-        font10 = tkfont.Font(family=FONT_FAMILY, size=10, weight="bold")
-        suffix = "  ›" if has_children else ""
-        count = entry.get("count")
-        count_text = str(count) if count else None
-        count_pill_w = (font10.measure(count_text) + ISSUE_BADGE_PAD_X * 2) if count_text else 0
-        count_reserve = (count_pill_w + ISSUE_BADGE_GAP) if count_text else 0
-        right_reserve = GO_ZONE_W if has_go_button else 12
-        name_max_w = badge_w - 12 - right_reserve - count_reserve - font10.measure(suffix)
-        text = truncate_text(font10, name, name_max_w) + suffix
+        size = QUICK_TOOLBAR_ICON_SIZE
+        buttons = [
+            (self.quick_my_icon, self._open_my_issues_flyout),
+            (self.quick_bookmark_icon, self._open_favorites_flyout),
+            (self.quick_folder_icon, self._open_all_projects_flyout),
+            (self.quick_folder_icon, self._open_team_redmine),
+            (self.quick_window_icon, self._open_resolved_by_version_window),
+        ]
+        width = QUICK_TOOLBAR_TOTAL_W
+
+        toolbar = tk.Toplevel(self.root)
+        toolbar.overrideredirect(True)
+        toolbar.attributes("-topmost", True)
+        toolbar.configure(bg=ICON_KEY_COLOR)
+        toolbar.attributes("-transparentcolor", ICON_KEY_COLOR)
+
+        x = self.icon_x + ICON_SIZE + QUICK_TOOLBAR_MARGIN
+        y = self.icon_y + (ICON_SIZE - size) // 2
+        toolbar.geometry(f"{width}x{size}+{x}+{y}")
 
         canvas = tk.Canvas(
-            self.panel, width=badge_w, height=BADGE_H,
-            bg=PANEL_BG, highlightthickness=0, cursor="hand2",
+            toolbar, width=width, height=size,
+            bg=ICON_KEY_COLOR, highlightthickness=0,
         )
-        canvas.pack(padx=pad, pady=2)
+        canvas.pack(expand=True, fill="both")
 
-        def render(bg, fg=BADGE_FG):
-            canvas.delete("badge")
-            _, cy = draw_card(canvas, badge_w, BADGE_H, BADGE_RADIUS, bg)
-            canvas.create_text(
-                12, cy, anchor="w", text=text, fill=fg,
-                font=badge_font, tags="badge",
+        for i, (glyph, handler) in enumerate(buttons):
+            cx0 = i * (size + QUICK_TOOLBAR_GAP)
+            draw_rounded_rect(
+                canvas, cx0, 0, cx0 + size - 1, size - 1, QUICK_TOOLBAR_RADIUS,
+                fill=ICON_BUTTON_BG, outline="",
             )
-            if count_text:
-                # 개수 뱃지: 라벨 텍스트 바로 뒤에 포인트 컬러 알약으로 표시한다.
-                pill_x = 12 + font10.measure(text) + ISSUE_BADGE_GAP
-                pill_y1, pill_y2 = cy - ISSUE_BADGE_H / 2, cy + ISSUE_BADGE_H / 2
-                draw_rounded_rect(
-                    canvas, pill_x, pill_y1, pill_x + count_pill_w, pill_y2, ISSUE_BADGE_H / 2,
-                    fill=BG_COLOR, outline="", tags="badge",
+            canvas.create_image(cx0 + size / 2, size / 2, image=glyph)
+            tag = f"quick_btn_{i}"
+            canvas.create_rectangle(
+                cx0, 0, cx0 + size, size, fill="", outline="", tags=tag,
+            )
+            canvas.tag_bind(tag, "<Button-1>", lambda _e, h=handler: h())
+
+            # "내 일감" 아이콘 오른쪽 위 모서리에 개수 뱃지 표시
+            # (테두리 스트로크는 색상키/배경과 얽혀 흰 테두리로 보이는 문제가 있어 안 씀.
+            #  퀵 툴바 캔버스 높이가 아이콘 높이(size)와 딱 맞아서, 모서리 밖으로 튀어나오게
+            #  그리면 캔버스 밖으로 잘리므로 캔버스 안쪽에 완전히 들어오게 그린다)
+            if i == 0 and self.my_issues:
+                count_text = str(len(self.my_issues)) if len(self.my_issues) <= 99 else "99+"
+                badge_r = 9
+                badge_cx, badge_cy = cx0 + size - badge_r - 2, badge_r + 2
+                canvas.create_oval(
+                    badge_cx - badge_r, badge_cy - badge_r, badge_cx + badge_r, badge_cy + badge_r,
+                    fill="#E5484D", outline="",
                 )
                 canvas.create_text(
-                    pill_x + count_pill_w / 2, cy, text=count_text, fill="#FFFFFF",
-                    font=badge_font, tags="badge",
-                )
-            if has_go_button:
-                canvas.create_image(
-                    badge_w - 1 - SHADOW_OFFSET - GO_ZONE_W / 2, cy,
-                    image=self.go_icon, tags="badge",
+                    badge_cx, badge_cy, text=count_text, fill="#FFFFFF",
+                    font=(FONT_FAMILY, 8, "bold"),
                 )
 
-        def restore_idle():
-            # 이 뱃지가 현재 펼쳐진(depth 0을 연) 상태라면 선택 표시를 유지한다.
-            if self.active_main_badge and self.active_main_badge[0] is canvas:
-                render(BADGE_SELECTED_BG, BADGE_SELECTED_FG)
-            else:
-                render(BADGE_BG)
+        canvas.configure(cursor="hand2")
+        self.quick_toolbar = toolbar
 
-        render(BADGE_BG)
+    def _close_quick_toolbar(self):
+        if self.quick_toolbar is not None:
+            self.quick_toolbar.destroy()
+            self.quick_toolbar = None
 
-        if has_children:
-            def click(e):
-                if has_go_button and e.x >= badge_w - GO_ZONE_W:
-                    # 오른쪽 끝 "↗" 버튼: 하위 목록을 펼치지 않고 이 항목 자체 페이지로 바로 이동
-                    self._open_and_close(url)
+    def _open_my_issues_flyout(self):
+        if not self.redmine_user_id:
+            self.open_set_user_id_dialog()
+            return
+        # "[프로젝트명] 제목" 형태인 내 일감 제목에서 프로젝트명을 뽑아 프로젝트별로 묶는다.
+        groups = {}
+        order = []
+        for issue in self.my_issues:
+            m = re.match(r"^\[(.+?)\]\s*(.*)$", issue["title"])
+            project_name, subject = (m.group(1), m.group(2)) if m else ("프로젝트 미상", issue["title"])
+            if project_name not in groups:
+                groups[project_name] = []
+                order.append(project_name)
+            groups[project_name].append(
+                {"issue_id": issue["issue_id"], "title": subject, "url": issue["url"]}
+            )
+        self._open_project_issue_window(
+            "my_issues_win", "내 일감",
+            sorted(
+                [{"project": p, "issues": groups[p]} for p in order],
+                key=lambda g: g["project"],
+            ),
+        )
+
+    def _open_favorites_flyout(self):
+        groups = sorted(
+            [
+                {"project": f["name"], "issues": self.favorite_issues.get(str(f["id"]), [])}
+                for f in self.favorites
+            ],
+            key=lambda g: g["project"],
+        )
+        self._open_project_issue_window("favorites_win", "즐겨찾기 프로젝트", groups)
+
+    # ── "내 일감" / "즐겨찾기 프로젝트" 공용 2단(4:6) 창 ─────
+    #    윈도우 11 시작 메뉴처럼 고정된 크기로 뜨고, 왼쪽엔 프로젝트, 오른쪽엔
+    #    선택한 프로젝트의 일감을 보여준다. groups: [{"project": str, "issues": [...]}]
+    def _open_project_issue_window(self, slot_attr, title, groups):
+        existing = getattr(self, slot_attr)
+        if existing is not None and existing.winfo_exists():
+            # 아이콘을 다시 누른 것 → 다른 위젯 패널들처럼 토글로 닫는다.
+            existing.destroy()
+            return
+
+        win_w, win_h = 800, WIDGET_WINDOW_H  # 윈도우 11 시작 메뉴와 비슷한 고정 크기(내용에 따라 안 늘어남)
+        pad = 12
+
+        win_bg, left_bg, right_bg = "#ECEAF2", "#ECEAF2", "#ECEAF2"
+        text_fg, muted_fg = "#332C46", "#585070"
+        card_bg, card_hover = "#FFFFFF", "#DEE1F5"  # 카드 기본/호버(포인트 색 파스텔 톤)
+        accent_dark, selected_fg = "#5C6BC0", "#FFFFFF"  # 선택 시 포인트 색 배경 + 흰 글자
+        divider_color = "#D6D2E2"
+
+        win = tk.Toplevel(self.root)
+        win.overrideredirect(True)  # 팝업창이 아니라 다른 위젯 패널들처럼 테두리/타이틀바 없이
+        # 창 네 모서리를 살짝 둥글게 깎기 위해, 창 배경 자체를 색상키로 투명 처리해두고
+        # (실제 내용은 아래에서 각 프레임이 자기 색으로 완전히 덮으므로 평소엔 안 보임)
+        # 맨 마지막에 모서리 4곳에만 둥근 "마스크"를 얹어 그 부분만 배경이 비치게 한다.
+        win.configure(bg=ICON_KEY_COLOR)
+        win.attributes("-transparentcolor", ICON_KEY_COLOR)
+        win.attributes("-topmost", True)
+        # 위젯 바로 위, 아이콘 기준선에 딱 붙여서 뜨게 한다(다른 플라이아웃과 같은 기준).
+        base_y = self.icon_y - 8
+        win.geometry(f"{win_w}x{win_h}+{self.icon_x}+{base_y - win_h}")
+        win.grid_rowconfigure(0, weight=0)
+        win.grid_rowconfigure(1, weight=1)
+        win.grid_columnconfigure(0, weight=3)  # 왼쪽 30%: 프로젝트
+        win.grid_columnconfigure(1, weight=0)  # 구분선
+        win.grid_columnconfigure(2, weight=7)  # 오른쪽 70%: 일감
+
+        # 창 배경이 색상키(투명)라서, header_row 바깥에 padx/pady로 여백을 두면 그 여백
+        # 부분이 안 덮여서 구멍(투명)이 뚫려 보인다. 그래서 header_row는 셀을 여백 없이
+        # 꽉 채우고, 여백은 그 안쪽 자식 위젯들의 grid pad로 준다.
+        header_row = tk.Frame(win, bg=win_bg)
+        header_row.grid(row=0, column=0, columnspan=3, sticky="nsew")
+        header_row.grid_columnconfigure(0, weight=1)
+
+        tk.Label(
+            header_row, text=title, bg=win_bg, fg=text_fg, font=(FONT_FAMILY, 12, "bold"), anchor="w",
+        ).grid(row=0, column=0, sticky="w", padx=(pad, 0), pady=(pad, 6))
+
+        # 윈도우 11 시작 메뉴 검색창처럼: 완전히 둥근 알약 모양 안에 돋보기 아이콘 + 입력칸.
+        # tk.Entry 자체는 모서리를 못 둥글게 하므로, 둥근 사각형을 그린 캔버스 위에
+        # 테두리/배경 없는 Entry를 겹쳐서 마치 하나의 둥근 입력창처럼 보이게 만든다.
+        search_placeholder = "제목 검색..."
+        pill_w, pill_h = 320, 34
+        search_icon_muted = load_icon_glyph(SEARCH_ICON_FILE, 14, muted_fg)
+        search_icon_active = load_icon_glyph(SEARCH_ICON_FILE, 14, text_fg)
+
+        search_area = tk.Frame(header_row, bg=win_bg)
+        search_area.grid(row=0, column=1, sticky="e", padx=(0, pad), pady=(pad, 6))
+        search_canvas = tk.Canvas(
+            search_area, width=pill_w, height=pill_h, bg=win_bg, highlightthickness=0,
+        )
+        search_canvas.pack(side="left")
+        draw_rounded_rect(
+            search_canvas, 0, 0, pill_w - 1, pill_h - 1, pill_h / 2,
+            fill=card_bg, outline=divider_color,
+        )
+        icon_x = 18
+        icon_id = search_canvas.create_image(icon_x, pill_h / 2, image=search_icon_muted)
+
+        entry_x = icon_x + 16
+        entry_w = pill_w - entry_x - 16
+        search_entry = tk.Entry(
+            search_canvas, font=(FONT_FAMILY, 9), bg=card_bg, fg=muted_fg,
+            relief="flat", bd=0, highlightthickness=0, insertbackground=text_fg,
+        )
+        search_entry.insert(0, search_placeholder)
+        search_canvas.create_window(
+            entry_x, pill_h / 2, window=search_entry, anchor="w", width=entry_w, height=pill_h - 10,
+        )
+
+        def on_search_focus_in(_e):
+            search_canvas.itemconfigure(icon_id, image=search_icon_active)
+            if search_entry.get() == search_placeholder:
+                search_entry.delete(0, "end")
+                search_entry.config(fg=text_fg)
+
+        def on_search_focus_out(_e):
+            search_canvas.itemconfigure(icon_id, image=search_icon_muted)
+            if not search_entry.get():
+                search_entry.insert(0, search_placeholder)
+                search_entry.config(fg=muted_fg)
+
+        search_entry.bind("<FocusIn>", on_search_focus_in)
+        search_entry.bind("<FocusOut>", on_search_focus_out)
+        # 참조 유지(GC 방지) - 창이 열려 있는 동안만 필요하므로 창 자체에 매달아 둔다.
+        win._search_icons = (search_icon_muted, search_icon_active)
+
+        # 기본 스크롤바(양 끝 화살표 버튼 있는 투박한 모양) 대신, 화살표 없이 얇은
+        # 진한 보라 막대만 보이는 플랫 스크롤바로 새로 스타일을 정의한다.
+        # (트러프 색이 배경마다 달라서 왼쪽/오른쪽 패널용 스타일을 따로 둠)
+        style = ttk.Style(win)
+        style.theme_use("clam")
+
+        def define_scrollbar_style(name, trough_bg):
+            style.layout(name, [
+                ("Vertical.Scrollbar.trough", {"sticky": "ns", "children": [
+                    ("Vertical.Scrollbar.thumb", {"expand": True, "sticky": "nswe"}),
+                ]}),
+            ])
+            style.configure(
+                name, troughcolor=trough_bg, background=accent_dark,
+                bordercolor=trough_bg, lightcolor=accent_dark, darkcolor=accent_dark,
+                relief="flat", gripcount=0, arrowsize=0, width=8,
+            )
+            style.map(name, background=[("active", "#7E5CBB")])
+
+        define_scrollbar_style("Left.Vertical.TScrollbar", left_bg)
+        define_scrollbar_style("Right.Vertical.TScrollbar", right_bg)
+
+        def make_pane(col, bg, scrollbar_style):
+            frame = tk.Frame(win, bg=bg)
+            frame.grid(row=1, column=col, sticky="nsew")
+            # width/height=1: Canvas의 기본 요청 크기(기본값이 꽤 커서 grid weight
+            # 비율을 깨뜨림)를 없애야 3:7 비율이 실제로 지켜진다. fill="both"+expand=True가
+            # 어차피 실제 렌더링 크기를 그리드가 배분한 만큼으로 늘려준다.
+            canvas = tk.Canvas(frame, bg=bg, highlightthickness=0, width=1, height=1)
+            scrollbar = ttk.Scrollbar(
+                frame, orient="vertical", command=canvas.yview, style=scrollbar_style,
+            )
+            canvas.configure(yscrollcommand=scrollbar.set)
+            canvas.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+            body = tk.Frame(canvas, bg=bg)
+            window_id = canvas.create_window((0, 0), window=body, anchor="nw")
+            body.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+            canvas.bind("<Configure>", lambda e: canvas.itemconfigure(window_id, width=e.width))
+            return canvas, body, scrollbar
+
+        left_canvas, left_body, left_scrollbar = make_pane(0, left_bg, "Left.Vertical.TScrollbar")
+        tk.Frame(win, bg=divider_color, width=1).grid(row=1, column=1, sticky="ns")
+        right_canvas, right_body, right_scrollbar = make_pane(2, right_bg, "Right.Vertical.TScrollbar")
+        pane_canvases = [left_canvas, right_canvas]
+
+        # 창 크기가 고정이라 픽셀 폭을 미리 계산해도 어긋나지 않는다.
+        # (스크롤바 실제 폭은 테마/DPI에 따라 다를 수 있어 직접 측정한다)
+        win.update_idletasks()
+        left_pane_w = int(win_w * 0.3) - 1
+        right_pane_w = win_w - left_pane_w - 1
+        left_badge_w = left_pane_w - pad * 2 - left_scrollbar.winfo_reqwidth()
+        right_badge_w = right_pane_w - pad * 2 - right_scrollbar.winfo_reqwidth()
+
+        def on_mousewheel(e):
+            for c in pane_canvases:
+                if c.winfo_exists() and str(e.widget).startswith(str(c)):
+                    c.yview_scroll(int(-1 * (e.delta / 120)), "units")
                     return
-                if entry.get("my_issues") and not self.redmine_user_id:
-                    # "내 일감"인데 아직 사용자 ID가 없으면, 목록을 펼치는 대신 먼저 입력받는다.
-                    self.open_set_user_id_dialog()
-                    return
-                self.toggle_redmine_flyout(url, children, entry.get("flyout_width", FLYOUT_W))
-                if self.flyouts:
-                    # 새로 펼쳐짐 → 이 뱃지를 선택 표시하고, 이전에 선택돼 있던 다른 뱃지는 되돌린다.
-                    prev = self.active_main_badge
-                    if prev and prev[0] is not canvas and prev[0].winfo_exists():
-                        prev[1](BADGE_BG)
-                    self.active_main_badge = (canvas, render)
-                    render(BADGE_SELECTED_BG, BADGE_SELECTED_FG)
-                elif canvas.winfo_exists():
-                    # 다시 클릭해서 닫혔거나(선택 해제), 프로젝트 목록이 없어 패널 자체가
-                    # 닫혔을 수 있으므로(이 경우 canvas가 이미 사라졌으므로) 존재를 확인한다.
-                    self.active_main_badge = None
-                    render(BADGE_BG)
+
+        left_canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+        def cleanup(_e=None):
+            left_canvas.unbind_all("<MouseWheel>")
+            setattr(self, slot_attr, None)
+
+        win.bind("<Destroy>", lambda e: cleanup() if e.widget is win else None)
+
+        def render_right_placeholder(text):
+            for w in right_body.winfo_children():
+                w.destroy()
+            tk.Label(
+                right_body, text=text, bg=right_bg, fg=muted_fg, font=(FONT_FAMILY, 10),
+            ).pack(padx=pad, pady=pad, anchor="w")
+
+        issue_font = tkfont.Font(family=FONT_FAMILY, size=9, weight="bold")
+
+        def add_issue_card(issue):
+            row_h = 34
+            label_text = f"#{issue['issue_id']}  {issue['title']}"
+
+            canvas = tk.Canvas(
+                right_body, width=right_badge_w, height=row_h,
+                bg=right_bg, highlightthickness=0, cursor="hand2",
+            )
+            canvas.pack(padx=pad, pady=2)
+
+            def render(hover=False):
+                canvas.delete("card")
+                bg = card_hover if hover else card_bg
+                draw_rounded_rect(canvas, 0, 0, right_badge_w - 1, row_h - 1, 8, fill=bg, outline="")
+                cy = (row_h - 1) / 2
+                text = truncate_text(issue_font, label_text, right_badge_w - 24)
+                canvas.create_text(12, cy, anchor="w", text=text, fill=text_fg, font=issue_font, tags="card")
+
+            canvas.bind("<Configure>", lambda e: render())
+            canvas.bind("<Enter>", lambda e: render(hover=True))
+            canvas.bind("<Leave>", lambda e: render())
+            canvas.bind("<Button-1>", lambda e, url=issue["url"]: open_url(url))
+            render()
+
+        def render_right_issues(issues):
+            for w in right_body.winfo_children():
+                w.destroy()
+            if not issues:
+                render_right_placeholder("일감이 없습니다.")
+                return
+            for issue in issues:
+                add_issue_card(issue)
+
+        selected = {"render": None, "state": None}
+        project_font = tkfont.Font(family=FONT_FAMILY, size=9, weight="bold")
+
+        count_font = tkfont.Font(family=FONT_FAMILY, size=8, weight="bold")
+
+        def add_project_card(project_name, issues):
+            row_h = SUB_BADGE_H
+            count_text = str(len(issues))
+            # 숫자 폭에 맞춰 커지되(두 자리 이상도 안 잘리게) 최소 지름은 보장하는 원.
+            circle_d = max(count_font.measure(count_text) + 10, ISSUE_BADGE_H)
+
+            canvas = tk.Canvas(
+                left_body, width=left_badge_w, height=row_h,
+                bg=left_bg, highlightthickness=0, cursor="hand2",
+            )
+            canvas.pack(padx=pad, pady=2)
+
+            state = {"selected": False}
+
+            def render(hover=False):
+                canvas.delete("badge")
+                if state["selected"]:
+                    bg, fg, circle_bg, circle_fg = accent_dark, selected_fg, selected_fg, accent_dark
+                else:
+                    bg, fg = (card_hover if hover else card_bg), text_fg
+                    circle_bg, circle_fg = accent_dark, "#FFFFFF"
+                draw_rounded_rect(canvas, 0, 0, left_badge_w - 1, row_h - 1, 8, fill=bg, outline="")
+                # 개수 뱃지(원형)를 카드 오른쪽 끝에 붙이고, 프로젝트명은 그 왼쪽 칸에서만 표시
+                circle_x2 = left_badge_w - 10
+                circle_x1 = circle_x2 - circle_d
+                circle_y1, circle_y2 = row_h / 2 - circle_d / 2, row_h / 2 + circle_d / 2
+                canvas.create_oval(
+                    circle_x1, circle_y1, circle_x2, circle_y2, fill=circle_bg, outline="", tags="badge",
+                )
+                canvas.create_text(
+                    (circle_x1 + circle_x2) / 2, row_h / 2, text=count_text, fill=circle_fg,
+                    font=count_font, tags="badge",
+                )
+                name_max_w = circle_x1 - 12 - 6
+                text = truncate_text(project_font, project_name, name_max_w)
+                canvas.create_text(
+                    12, row_h / 2, anchor="w", text=text, fill=fg, font=project_font, tags="badge",
+                )
+
+            def on_click(_e):
+                if selected["render"] is not None and selected["render"] is not render:
+                    selected["state"]["selected"] = False
+                    selected["render"]()
+                state["selected"] = True
+                render()
+                selected["state"] = state
+                selected["render"] = render
+                render_right_issues(issues)
+
+            canvas.bind("<Button-1>", on_click)
+            canvas.bind("<Enter>", lambda e: render(hover=True))
+            canvas.bind("<Leave>", lambda e: render())
+            render()
+
+        if not groups:
+            tk.Label(
+                left_body, text="표시할 프로젝트가 없습니다.",
+                bg=left_bg, fg=muted_fg, font=(FONT_FAMILY, 9), anchor="w", justify="left",
+                wraplength=left_badge_w,
+            ).pack(padx=pad, pady=pad, anchor="w")
         else:
-            click = lambda e: self._open_and_close(url)
+            for group in groups:
+                add_project_card(group["project"], group["issues"])
 
-        canvas.bind("<Button-1>", click)
-        if entry.get("removable"):
-            canvas.bind("<Button-3>", lambda e, nm=name: self.show_delete_link_menu(e, nm))
-        elif entry.get("my_issues"):
-            canvas.bind("<Button-3>", lambda e: self.open_set_user_id_dialog())
-        canvas.bind("<Enter>", lambda e: render(BADGE_HOVER))
-        canvas.bind("<Leave>", lambda e: restore_idle())
+        # 헤더 검색: 선택된 프로젝트와 상관없이 즐겨찾기 전체 일감 제목에서 찾는다.
+        def clear_project_selection():
+            if selected["render"] is not None:
+                selected["state"]["selected"] = False
+                selected["render"]()
+                selected["state"] = None
+                selected["render"] = None
+
+        def fire_search():
+            query = search_entry.get().strip()
+            if query == search_placeholder:
+                query = ""
+            clear_project_selection()
+            if not query:
+                render_right_placeholder("왼쪽에서 프로젝트를 선택하세요.")
+                return
+            q = query.lower()
+            matches = [
+                {"issue_id": issue["issue_id"], "url": issue["url"],
+                 "title": f"[{group['project']}] {issue['title']}"}
+                for group in groups for issue in group["issues"]
+                if q in issue["title"].lower()
+            ]
+            render_right_issues(matches)
+
+        search_entry.bind("<KeyRelease>", lambda e: fire_search())
+        search_entry.bind("<Return>", lambda e: fire_search())
+        search_canvas.tag_bind(icon_id, "<Button-1>", lambda e: fire_search())
+        search_canvas.tag_bind(icon_id, "<Enter>", lambda e: search_canvas.config(cursor="hand2"))
+        search_canvas.tag_bind(icon_id, "<Leave>", lambda e: search_canvas.config(cursor=""))
+
+        render_right_placeholder("왼쪽에서 프로젝트를 선택하세요.")
+
+        # 창 네 모서리를 둥글게: 각 모서리에 작은 정사각형 캔버스를 겹쳐 올리고,
+        # 안쪽(창 중심 방향)으로 치우친 원을 그려서 바깥쪽 뾰족한 부분만 색상키로
+        # 남겨 투명(둥글게 깎인 것처럼) 되게 한다.
+        corner_r = 14
+
+        def add_corner_mask(x, y, circle_bbox, fill):
+            c = tk.Canvas(win, width=corner_r, height=corner_r, bg=ICON_KEY_COLOR, highlightthickness=0)
+            c.place(x=x, y=y)
+            c.create_oval(*circle_bbox, fill=fill, outline="")
+
+        add_corner_mask(0, 0, (0, 0, corner_r * 2, corner_r * 2), win_bg)
+        add_corner_mask(win_w - corner_r, 0, (-corner_r, 0, corner_r, corner_r * 2), win_bg)
+        add_corner_mask(0, win_h - corner_r, (0, -corner_r, corner_r * 2, corner_r), left_bg)
+        add_corner_mask(
+            win_w - corner_r, win_h - corner_r, (-corner_r, -corner_r, corner_r, corner_r), right_bg,
+        )
+
+        setattr(self, slot_attr, win)
+
+    def _open_all_projects_flyout(self):
+        self.toggle_redmine_flyout(LINKS[0][1], self.redmine_tree, FLYOUT_W, title="전사 프로젝트")
+
+    def _open_team_redmine(self):
+        # 팀 레드마인은 전사 레드마인과 별도 서버라 프로젝트 트리 API가 없으므로 링크만 바로 연다.
+        self._open_and_close(TEAM_REDMINE_URL)
+
+    # ── "버전별 해결 일감" 창 (왼쪽 30% 프로젝트 트리 / 오른쪽 70% 선택한 프로젝트의 버전별 해결 이슈) ──
+    #    지금은 레이아웃 확인용이라 상태 기준(status_id=closed)은 나중에 조정될 수 있다.
+    def _open_resolved_by_version_window(self):
+        if self.resolved_by_version_win is not None and self.resolved_by_version_win.winfo_exists():
+            self.resolved_by_version_win.lift()
+            self.resolved_by_version_win.focus_force()
+            return
+
+        win_bg = "#F3F1FA"
+        text_fg, muted_fg, accent = "#38304F", "#5E5379", "#6B54B0"
+        selected_bg, selected_fg = accent, "#FFFFFF"
+        card_bg, card_hover = "#FFFFFF", "#EAE4F7"  # 카드 기본/호버 배경
+        guide_color = "#B8AED0"  # depth를 나타내는 점선 가이드 색
+        divider_color = "#DCD5EE"
+
+        win = tk.Toplevel(self.root)
+        win.title("버전별 해결 일감")
+        win.configure(bg=win_bg)
+        win.attributes("-topmost", True)
+        win.geometry(f"1000x600+{self.icon_x}+{max(self.icon_y - 600, 0)}")
+        win.grid_rowconfigure(0, weight=1)
+        win.grid_columnconfigure(0, weight=3)  # 프로젝트 30%
+        win.grid_columnconfigure(1, weight=0)  # 구분선
+        win.grid_columnconfigure(2, weight=3)  # 버전 30%
+        win.grid_columnconfigure(3, weight=0)  # 구분선
+        win.grid_columnconfigure(4, weight=4)  # 이슈 40%
+
+        def make_pane(col):
+            frame = tk.Frame(win, bg=win_bg)
+            frame.grid(row=0, column=col, sticky="nsew")
+            # width/height=1: Canvas 기본 요청 크기가 grid weight 비율(3:3:4)을 깨뜨리는 걸 막는다.
+            canvas = tk.Canvas(frame, bg=win_bg, highlightthickness=0, width=1, height=1)
+            scrollbar = tk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+            canvas.configure(yscrollcommand=scrollbar.set)
+            canvas.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+            body = tk.Frame(canvas, bg=win_bg)
+            window_id = canvas.create_window((0, 0), window=body, anchor="nw")
+            body.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+            canvas.bind("<Configure>", lambda e: canvas.itemconfigure(window_id, width=e.width))
+            return canvas, body
+
+        project_canvas, project_body = make_pane(0)
+        tk.Frame(win, bg=divider_color, width=1).grid(row=0, column=1, sticky="ns")
+        version_canvas, version_body = make_pane(2)
+        tk.Frame(win, bg=divider_color, width=1).grid(row=0, column=3, sticky="ns")
+        issue_canvas, issue_body = make_pane(4)
+        pane_canvases = [project_canvas, version_canvas, issue_canvas]
+
+        def on_mousewheel(e):
+            for c in pane_canvases:
+                if c.winfo_exists() and str(e.widget).startswith(str(c)):
+                    c.yview_scroll(int(-1 * (e.delta / 120)), "units")
+                    return
+
+        project_canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+        def cleanup(_e=None):
+            project_canvas.unbind_all("<MouseWheel>")
+            self.resolved_by_version_win = None
+
+        win.bind("<Destroy>", lambda e: cleanup() if e.widget is win else None)
+
+        selected_project = {"render": None, "state": None}
+        selected_version = {"render": None, "state": None}
+        load_token = {"value": 0}  # 버전 목록 결과가 최신 클릭에 대한 것인지 확인하는 토큰
+
+        def render_placeholder(body, text):
+            for w in body.winfo_children():
+                w.destroy()
+            tk.Label(
+                body, text=text, bg=win_bg, fg=muted_fg, font=(FONT_FAMILY, 10),
+            ).pack(padx=16, pady=16, anchor="w")
+
+        # 이슈 하나를 그림자 없는 둥근 카드로 그린다. (프로젝트/버전 카드와 같은 스타일)
+        def add_issue_card(issue):
+            row_h = 32
+            issue_font = tkfont.Font(family=FONT_FAMILY, size=9)
+            label_text = f"#{issue['id']}  {issue['subject']}"
+
+            canvas = tk.Canvas(issue_body, height=row_h, bg=win_bg, highlightthickness=0, cursor="hand2")
+            canvas.pack(fill="x", padx=8, pady=2)
+
+            def render(hover=False):
+                canvas.delete("card")
+                w = canvas.winfo_width()
+                if w <= 1:
+                    return
+                bg = card_hover if hover else card_bg
+                draw_rounded_rect(canvas, 0, 0, w - 1, row_h - 1, 8, fill=bg, outline="", tags="card")
+                cy = (row_h - 1) / 2
+                max_text_w = (w - 1) - 24
+                text = truncate_text(issue_font, label_text, max_text_w)
+                canvas.create_text(12, cy, anchor="w", text=text, fill=text_fg, font=issue_font, tags="card")
+
+            canvas.bind("<Configure>", lambda e: render())
+            canvas.bind("<Enter>", lambda e: render(hover=True))
+            canvas.bind("<Leave>", lambda e: render())
+            canvas.bind("<Button-1>", lambda e, url=issue["url"]: open_url(url))
+
+        def render_issue_list(issues):
+            for w in issue_body.winfo_children():
+                w.destroy()
+            if not issues:
+                render_placeholder(issue_body, "이슈가 없습니다.")
+                return
+            for issue in issues:
+                add_issue_card(issue)
+
+        # 버전 하나를 둥근 카드로 그린다. 클릭하면 오른쪽 이슈 패널을 그 버전 기준으로 채운다.
+        def add_version_card(group):
+            row_h = 34
+            version_font = tkfont.Font(family=FONT_FAMILY, size=9, weight="bold")
+            label_text = f"{group['version']} ({len(group['issues'])})"
+
+            canvas = tk.Canvas(version_body, height=row_h, bg=win_bg, highlightthickness=0, cursor="hand2")
+            canvas.pack(fill="x", padx=8, pady=3)
+
+            state = {"selected": False}
+
+            def render(hover=False):
+                canvas.delete("card")
+                w = canvas.winfo_width()
+                if w <= 1:
+                    return
+                if state["selected"]:
+                    bg, fg = selected_bg, selected_fg
+                else:
+                    bg, fg = (card_hover if hover else card_bg), text_fg
+                draw_rounded_rect(canvas, 0, 0, w - 1, row_h - 1, 8, fill=bg, outline="", tags="card")
+                cy = (row_h - 1) / 2
+                max_text_w = (w - 1) - 24
+                text = truncate_text(version_font, label_text, max_text_w)
+                canvas.create_text(12, cy, anchor="w", text=text, fill=fg, font=version_font, tags="card")
+
+            canvas.bind("<Configure>", lambda e: render())
+            canvas.bind("<Enter>", lambda e: render(hover=True))
+            canvas.bind("<Leave>", lambda e: render())
+
+            def on_click(_e):
+                if selected_version["render"] is not None and selected_version["render"] is not render:
+                    selected_version["state"]["selected"] = False
+                    selected_version["render"]()
+                state["selected"] = True
+                render()
+                selected_version["state"] = state
+                selected_version["render"] = render
+                render_issue_list(group["issues"])
+
+            canvas.bind("<Button-1>", on_click)
+
+        def render_version_groups(groups):
+            for w in version_body.winfo_children():
+                w.destroy()
+            selected_version["render"] = None
+            selected_version["state"] = None
+            render_placeholder(issue_body, "왼쪽에서 버전을 선택하세요.")
+            if not groups:
+                render_placeholder(version_body, "해결된 이슈가 없거나 불러오지 못했습니다.")
+                return
+            for group in groups:
+                add_version_card(group)
+
+        def select_project(project_id):
+            load_token["value"] += 1
+            token = load_token["value"]
+
+            render_placeholder(version_body, "불러오는 중...")
+            render_placeholder(issue_body, "왼쪽에서 버전을 선택하세요.")
+            result_queue = queue.Queue()
+
+            def worker():
+                result_queue.put(fetch_resolved_issues_by_version(project_id))
+
+            threading.Thread(target=worker, daemon=True).start()
+
+            def poll():
+                if not win.winfo_exists():
+                    return
+                try:
+                    groups = result_queue.get_nowait()
+                except queue.Empty:
+                    win.after(200, poll)
+                    return
+                # 그 사이 다른 프로젝트를 클릭했으면(선택이 바뀌었으면) 이 결과는 버린다.
+                if load_token["value"] == token:
+                    render_version_groups(groups)
+
+            poll()
+
+        # 프로젝트 하나를 웹 리스트처럼 둥근 카드(호버 + 선택 강조)로 그린다.
+        # depth가 깊을수록 카드를 왼쪽에서 더 들여써서 계층을 표현한다.
+        def add_project_row(node, depth):
+            label_text = node["name"]
+            indent = depth * 18  # 카드 자체를 이만큼 오른쪽으로 밀어서 depth를 표현
+            row_h = 34
+            card_font = tkfont.Font(
+                family=FONT_FAMILY, size=9, weight="bold" if depth == 0 else "normal",
+            )
+
+            canvas = tk.Canvas(project_body, height=row_h, bg=win_bg, highlightthickness=0, cursor="hand2")
+            canvas.pack(fill="x", padx=(8, 10), pady=3)
+
+            state = {"selected": False}
+
+            def render(hover=False):
+                canvas.delete("card")
+                w = canvas.winfo_width()
+                if w <= 1:
+                    return
+                # depth가 0보다 크면, 바로 위 부모 레벨에서 세로+가로로 꺾이는
+                # "ㄴ" 모양(점선) 하나만 그려 이 카드로 이어준다. (조상 레벨을 잇는
+                # 트렁크 세로선은 그리지 않음 - 바로 위/아래 관계만 표시)
+                if depth > 0:
+                    elbow_x = (depth - 1) * 18 + 9
+                    elbow_y = row_h / 2
+                    canvas.create_line(
+                        elbow_x, 0, elbow_x, elbow_y, dash=(2, 2), fill=guide_color, tags="card",
+                    )
+                    canvas.create_line(
+                        elbow_x, elbow_y, indent, elbow_y, dash=(2, 2), fill=guide_color, tags="card",
+                    )
+                if state["selected"]:
+                    bg, fg = selected_bg, selected_fg
+                else:
+                    bg, fg = (card_hover if hover else card_bg), text_fg
+                draw_rounded_rect(
+                    canvas, indent, 0, w - 1, row_h - 1, 8,
+                    fill=bg, outline="", tags="card",
+                )
+                cy = (row_h - 1) / 2
+                text_x = indent + 12
+                max_text_w = (w - 1) - text_x - 12
+                text = truncate_text(card_font, label_text, max_text_w)
+                canvas.create_text(text_x, cy, anchor="w", text=text, fill=fg, font=card_font, tags="card")
+
+            canvas.bind("<Configure>", lambda e: render())
+            canvas.bind("<Enter>", lambda e: render(hover=True))
+            canvas.bind("<Leave>", lambda e: render())
+
+            def on_click(_e, pid=node["id"]):
+                if selected_project["render"] is not None and selected_project["render"] is not render:
+                    selected_project["state"]["selected"] = False
+                    selected_project["render"]()
+                state["selected"] = True
+                render()
+                selected_project["state"] = state
+                selected_project["render"] = render
+                select_project(pid)
+
+            canvas.bind("<Button-1>", on_click)
+
+            for child in node.get("children") or []:
+                add_project_row(child, depth + 1)
+
+        if not self.redmine_tree:
+            tk.Label(
+                project_body, text="프로젝트 목록을 불러오는 중이거나 없습니다.",
+                bg=win_bg, fg=muted_fg, font=(FONT_FAMILY, 9), anchor="w", justify="left", wraplength=200,
+            ).pack(padx=8, pady=8, anchor="w")
+        else:
+            for root_node in self.redmine_tree:
+                add_project_row(root_node, 0)
+
+        render_placeholder(version_body, "왼쪽에서 프로젝트를 선택하세요.")
+        render_placeholder(issue_body, "프로젝트와 버전을 선택하세요.")
+
+        self.resolved_by_version_win = win
 
     def _open_and_close(self, url):
         open_url(url)
-        self.close_panel()
-
-    # ── 사용자 추가 링크 삭제 (뱃지 우클릭) ─────
-    def show_delete_link_menu(self, event, name):
-        menu = tk.Menu(self.root, tearoff=0)
-        menu.add_command(label="삭제", command=lambda: self.remove_link(name))
-        menu.tk_popup(event.x_root, event.y_root)
-
-    def remove_link(self, name):
-        self.custom_links = [item for item in self.custom_links if item["name"] != name]
-        save_custom_links(self.custom_links)
         self.close_panel()
 
     # ── 즐겨찾기 (레드마인 프로젝트 뱃지 우클릭) ─────
@@ -1188,7 +1731,7 @@ class AssistantWidget:
         menu.tk_popup(event.x_root, event.y_root)
 
     # ── 레드마인 프로젝트 플라이아웃 (최상위 → 하위로 depth별 오른쪽에 펼침) ──
-    def toggle_redmine_flyout(self, fallback_url, top_level_nodes, width=FLYOUT_W):
+    def toggle_redmine_flyout(self, fallback_url, top_level_nodes, width=FLYOUT_W, title=None):
         if self.flyouts:
             self.close_all_flyouts()
             return
@@ -1196,9 +1739,9 @@ class AssistantWidget:
             # 아직 못 불러왔거나 등록된 프로젝트가 없으면 기본 링크로 이동
             self._open_and_close(fallback_url)
             return
-        self.open_flyout_level(0, top_level_nodes, width)
+        self.open_flyout_level(0, top_level_nodes, width, title=title)
 
-    def open_flyout_level(self, depth, nodes, width=FLYOUT_W, project_id=None):
+    def open_flyout_level(self, depth, nodes, width=FLYOUT_W, project_id=None, title=None, type_filter=False):
         # 같은 depth를 다시 열 때는 그보다 깊은 플라이아웃부터 정리
         self.close_flyouts_from(depth)
 
@@ -1216,29 +1759,88 @@ class AssistantWidget:
             row_h = SUB_BADGE_H
         item_h = row_h + 4  # 배지 높이 + 위아래 pady(2)*2
         search_h = SEARCH_BOX_H if is_issue_list else 0
-        content_h = pad * 2 + search_h + len(nodes) * item_h
-        max_h = min(560, self.sh - 160)  # 화면을 벗어나지 않는 선에서 최대 높이 제한
-        panel_h = min(content_h, max_h)
-        needs_scroll = content_h > max_h
+        # depth 0(제목 있음)이든 하위 depth(제목 없음)든 항상 같은 높이를 확보해야,
+        # 오른쪽으로 펼쳐지는 하위 프로젝트 목록의 시작 위치가 최상위 목록과 맞는다.
+        title_h = 36
+        type_filter_h = 34 if type_filter else 0  # 일감 유형(트래커) 필터 뱃지 줄 높이
+        content_h = pad * 2 + title_h + type_filter_h + search_h + len(nodes) * item_h
+        # 내용量과 상관없이 "내 일감"/"즐겨찾기 프로젝트" 창과 높이를 맞춘다(너비는 그대로 FLYOUT_W).
+        panel_h = min(WIDGET_WINDOW_H, self.sh - 160)
+        needs_scroll = content_h > panel_h
 
-        # 메인 패널의 아래쪽 기준선에 맞춰, depth가 깊을수록 오른쪽 칸에 위로 쌓아 표시
+        # 퀵 툴바(원형 아이콘들) 바로 위에, depth가 깊을수록 오른쪽 칸으로 쌓아 표시
         # (아이콘이 화면 맨 아래에 있으므로 위→아래가 아니라 아래→위로 쌓아야 안 잘림)
         base_y = self.icon_y - 8
-        x = self.icon_x + PANEL_W + (PANEL_GAP + FLYOUT_W) * depth
+        x = self.icon_x + (PANEL_GAP + FLYOUT_W) * depth
         y = base_y - panel_h
         flyout.geometry(f"{width}x{panel_h}+{x}+{y}")
 
+        # 제목이 없어도(하위 depth) 같은 높이의 빈 칸을 확보해 목록 시작 위치를 맞춘다.
+        title_area = tk.Frame(flyout, bg=PANEL_BG, height=title_h)
+        title_area.pack(fill="x")
+        title_area.pack_propagate(False)
+        if title:
+            tk.Label(
+                title_area, text=title, bg=PANEL_BG, fg=BADGE_FG,
+                font=(FONT_FAMILY, 10, "bold"), anchor="w",
+            ).pack(fill="x", padx=pad, pady=(pad, 4))
+
+        if type_filter:
+            # 일감 유형(레드마인 트래커) 뱃지: 누르면 그 유형으로만 필터링, 다시 누르면 해제.
+            ISSUE_TYPES = ("개발", "이슈")
+            type_filter_state = {"active": None}
+            type_filter_buttons = {}
+
+            def apply_type_filter():
+                active = type_filter_state["active"]
+                render_nodes([n for n in nodes if n.get("tracker") == active] if active else nodes)
+
+            def toggle_type(type_name):
+                type_filter_state["active"] = (
+                    None if type_filter_state["active"] == type_name else type_name
+                )
+                for label, btn in type_filter_buttons.items():
+                    selected = label == type_filter_state["active"]
+                    btn.config(
+                        bg=BG_COLOR if selected else BADGE_BG,
+                        fg="#FFFFFF" if selected else BADGE_FG_MUTED,
+                    )
+                apply_type_filter()
+
+            filter_row = tk.Frame(flyout, bg=PANEL_BG)
+            filter_row.pack(fill="x", padx=pad, pady=(0, 4))
+            for type_name in ISSUE_TYPES:
+                btn = tk.Button(
+                    filter_row, text=type_name, font=(FONT_FAMILY, 9), bg=BADGE_BG, fg=BADGE_FG_MUTED,
+                    relief="flat", bd=0, padx=12, pady=3, cursor="hand2",
+                    activebackground=BADGE_HOVER, activeforeground=BADGE_FG,
+                    command=lambda t=type_name: toggle_type(t),
+                )
+                btn.pack(side="left", padx=(0, 6))
+                type_filter_buttons[type_name] = btn
+
         search_entry = None
-        search_placeholder = "제목+본문+댓글 검색..." if project_id is not None else "제목 검색..."
+        search_button = None
+        search_placeholder = "제목 검색..."
         if is_issue_list:
-            # 이슈 제목으로 검색할 수 있는 검색창을 목록 위에 둔다.
+            # 이슈 제목으로 검색할 수 있는 검색창 + 검색 버튼을 목록 위에 둔다.
+            search_row = tk.Frame(flyout, bg=PANEL_BG)
+            search_row.pack(fill="x", padx=pad, pady=(pad, 4))
+
             search_entry = tk.Entry(
-                flyout, font=(FONT_FAMILY, 9), bg=BADGE_BG, fg=BADGE_FG_MUTED,
+                search_row, font=(FONT_FAMILY, 9), bg=BADGE_BG, fg=BADGE_FG_MUTED,
                 relief="flat", insertbackground=BADGE_FG,
                 highlightthickness=1, highlightbackground=SHADOW_COLOR, highlightcolor=BG_COLOR,
             )
             search_entry.insert(0, search_placeholder)
-            search_entry.pack(fill="x", padx=pad, pady=(pad, 4), ipady=3)
+            search_entry.pack(side="left", fill="both", expand=True, ipady=3)
+
+            search_button = tk.Button(
+                search_row, image=self.search_icon, bg=BG_COLOR,
+                relief="flat", activebackground=BADGE_HOVER,
+                cursor="hand2", bd=0, padx=16,
+            )
+            search_button.pack(side="left", fill="y", padx=(6, 0))
 
             def on_search_focus_in(_e):
                 if search_entry.get() == search_placeholder:
@@ -1345,6 +1947,8 @@ class AssistantWidget:
 
             poll_search_queue()
             search_entry.bind("<KeyRelease>", on_search_change)
+            search_entry.bind("<Return>", lambda e: fire_search())
+            search_button.config(command=fire_search)
         elif search_entry is not None:
             def on_search_change(_e=None):
                 query = search_entry.get().strip()
@@ -1354,6 +1958,8 @@ class AssistantWidget:
                 render_nodes([n for n in nodes if query in n["name"].lower()] if query else nodes)
 
             search_entry.bind("<KeyRelease>", on_search_change)
+            search_entry.bind("<Return>", on_search_change)
+            search_button.config(command=on_search_change)
 
         self.flyouts.append(flyout)
 
@@ -1477,11 +2083,14 @@ class AssistantWidget:
                     self._open_and_close(url)
                     return
                 # 하위 목록이 이슈 목록이면(즐겨찾기 프로젝트의 이슈들) 제목이 길 수 있어 더 넓게 열고,
-                # 이 프로젝트의 id를 넘겨서 검색창이 레드마인 자체 검색을 쓸 수 있게 한다.
+                # 이 프로젝트의 id를 넘겨서 검색창이 레드마인 자체 검색을 쓸 수 있게 하고,
+                # 프로젝트 이름을 제목으로, 일감 유형(트래커) 필터 뱃지도 같이 보여준다.
                 is_issue_list = bool(children) and children[0].get("issue_id") is not None
                 self.open_flyout_level(
                     depth + 1, children, MY_ISSUES_FLYOUT_W if is_issue_list else FLYOUT_W,
                     project_id=node.get("id") if is_issue_list else None,
+                    title=node["name"] if is_issue_list else None,
+                    type_filter=is_issue_list,
                 )
                 # 새로 펼쳐짐 → 이 뱃지를 선택 표시하고, 이전에 선택돼 있던 다른 뱃지는 되돌린다.
                 prev = self.active_flyout_badge.get(depth)
