@@ -277,7 +277,9 @@ def resolve_user_id(identifier):
 
 def fetch_my_issues(identifier):
     """레드마인 REST API로 identifier(로그인 아이디 또는 숫자 ID)에게 할당된
-    미해결 이슈 목록을 가져온다. identifier가 없으면(아직 설정 전) 빈 리스트를 반환."""
+    이슈 목록(열림/닫힘 모두, 업데이트 최신순)을 가져온다. 열린 것만 따로 구분하지
+    않는 이유는, 목록 위 검색창에서 완료된 이슈까지 같이 검색되게 하기 위함이다.
+    identifier가 없으면(아직 설정 전) 빈 리스트를 반환."""
     if not identifier:
         return []
     api_key = load_redmine_api_key()
@@ -290,7 +292,7 @@ def fetch_my_issues(identifier):
 
     url = (
         f"{REDMINE_BASE_URL}/issues.json"
-        f"?assigned_to_id={user_id}&status_id=open&sort=updated_on:desc&limit=100"
+        f"?assigned_to_id={user_id}&status_id=*&sort=updated_on:desc&limit=100"
     )
     req = urllib.request.Request(url, headers={"X-Redmine-API-Key": api_key})
     try:
