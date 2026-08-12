@@ -1,0 +1,33 @@
+* { box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+    user-select: none;
+    font-family: "Noto Sans KR", "맑은 고딕", sans-serif;
+}
+
+#win {
+    width: 100%;
+    height: 100%;
+    background: #152340;
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+
+.item {
+    padding: 9px 12px;
+    border-radius: 8px;
+    color: #E4E9F2;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.item:hover {
+    background: #313F63;
+}

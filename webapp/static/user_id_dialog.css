@@ -1,0 +1,81 @@
+* { box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+    user-select: none;
+    font-family: "Noto Sans KR", "맑은 고딕", sans-serif;
+}
+
+#win {
+    width: 100%;
+    height: 100%;
+    background: #152340;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+
+#title {
+    color: #E4E9F2;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+#desc {
+    color: #E4E9F2;
+    font-size: 11px;
+    line-height: 1.6;
+    margin-bottom: 12px;
+}
+
+#idInput {
+    width: 100%;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid #313F63;
+    background: #233149;
+    color: #E4E9F2;
+    font-size: 13px;
+    font-family: inherit;
+    padding: 0 10px;
+    outline: none;
+}
+
+#idInput:focus {
+    border-color: #6E92C8;
+}
+
+#btnRow {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+button.dlg-btn {
+    border: none;
+    border-radius: 8px;
+    padding: 7px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+#btnCancel {
+    background: #313F63;
+    color: #E4E9F2;
+}
+
+#btnSave {
+    background: #6E92C8;
+    color: #152340;
+}

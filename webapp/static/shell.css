@@ -1,0 +1,114 @@
+* { box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+    user-select: none;
+    font-family: "Noto Sans KR", "맑은 고딕", sans-serif;
+}
+
+#root {
+    display: flex;
+    align-items: center;
+    height: 56px;
+    padding: 0;
+}
+
+.icon-btn {
+    width: 56px;
+    height: 56px;
+    min-width: 56px;
+    border-radius: 10px;
+    background: #152340;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: filter 0.12s ease;
+}
+
+.icon-btn:hover {
+    filter: brightness(1.12);
+}
+
+.icon-glyph {
+    width: 34px;
+    height: 34px;
+    background: #ffffff;
+    -webkit-mask-image: url("assets/icons/main.png");
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: contain;
+}
+
+#toolbar {
+    display: flex;
+    gap: 10px;
+    margin-left: 10px;
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: max-width 0.16s ease, opacity 0.16s ease, transform 0.16s ease;
+}
+
+#toolbar.open {
+    max-width: 340px;
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.tool-btn {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+    border-radius: 12px;
+    background: #152340;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: filter 0.12s ease, transform 0.08s ease;
+}
+
+.tool-btn:hover {
+    filter: brightness(1.15);
+}
+
+.tool-btn:active {
+    transform: scale(0.96);
+}
+
+.tool-btn .glyph {
+    width: 34px;
+    height: 34px;
+    background: #ffffff;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: contain;
+}
+
+.tool-btn .badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 9px;
+    background: #E5484D;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.tool-btn .badge.show {
+    display: flex;
+}

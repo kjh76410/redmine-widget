@@ -1,0 +1,148 @@
+* { box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+    user-select: none;
+    font-family: "Noto Sans KR", "맑은 고딕", sans-serif;
+}
+
+#win {
+    width: 100%;
+    height: 100%;
+    background: #F3F1FA;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+#title {
+    flex: none;
+    color: #38304F;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 14px 16px 8px;
+}
+
+#cols {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+}
+
+.col {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 4px 8px 12px;
+}
+
+#colProject { width: 30%; }
+#colVersion { width: 30%; }
+#colIssue { flex: 1; }
+
+.divider {
+    width: 1px;
+    background: #DCD5EE;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    height: 36px;
+    padding: 0 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #38304F;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.row:hover {
+    background: #EAE4F7;
+}
+
+.row.selected {
+    background: #6B54B0;
+    color: #FFFFFF;
+}
+
+.row .arrow {
+    width: 16px;
+    text-align: center;
+    color: #9C90BC;
+    font-size: 10px;
+    flex: none;
+}
+
+.row .label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.row .count {
+    flex: none;
+    margin-left: 8px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 6px;
+    background: #6B54B0;
+    color: #FFFFFF;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.row.selected .count {
+    background: #FFFFFF;
+    color: #6B54B0;
+}
+
+.children {
+    overflow: hidden;
+}
+
+.children.collapsed {
+    display: none;
+}
+
+.issue-row {
+    display: block;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #38304F;
+    font-size: 12px;
+}
+
+.issue-row:hover {
+    background: #EAE4F7;
+}
+
+.placeholder {
+    color: #5E5379;
+    font-size: 12px;
+    padding: 16px 10px;
+}
+
+.col::-webkit-scrollbar {
+    width: 8px;
+}
+
+.col::-webkit-scrollbar-thumb {
+    background: #6B54B0;
+    border-radius: 4px;
+}
+
+.col::-webkit-scrollbar-track {
+    background: transparent;
+}

@@ -1,37 +1,56 @@
 [
   {
-    "id": 170,
-    "name": "LM75 재난망 (A, D) ",
-    "url": "http://10.1.100.150/redmine/projects/lm75-a-d/issues"
-  },
-  {
     "id": 80,
     "name": "재난안전통신망",
-    "url": "http://10.1.100.150/redmine/projects/pslte/issues"
+    "url": "http://10.1.100.150/redmine/projects/pslte/issues",
+    "source": "company"
   },
   {
     "id": 147,
     "name": "MCPTT",
-    "url": "http://10.1.100.150/redmine/projects/mcx-in-mcptt/issues"
+    "url": "http://10.1.100.150/redmine/projects/mcx-in-mcptt/issues",
+    "source": "company"
   },
   {
     "id": 277,
     "name": "LM75EDC",
-    "url": "http://10.1.100.150/redmine/projects/lm75edc/issues"
+    "url": "http://10.1.100.150/redmine/projects/lm75edc/issues",
+    "source": "company"
   },
   {
     "id": 307,
     "name": "DANTE",
-    "url": "http://10.1.100.150/redmine/projects/dante/issues"
+    "url": "http://10.1.100.150/redmine/projects/dante/issues",
+    "source": "company"
   },
   {
     "id": 173,
     "name": "LM75D_PS",
-    "url": "http://10.1.100.150/redmine/projects/lm75d_ps/issues"
+    "url": "http://10.1.100.150/redmine/projects/lm75d_ps/issues",
+    "source": "company"
   },
   {
     "id": 172,
     "name": "CASPER",
-    "url": "http://10.1.100.150/redmine/projects/casper/issues"
+    "url": "http://10.1.100.150/redmine/projects/casper/issues",
+    "source": "company"
+  },
+  {
+    "id": 78,
+    "name": "소방",
+    "url": "http://10.1.100.20/projects/firefighting/issues",
+    "source": "team"
+  },
+  {
+    "id": 149,
+    "name": "LTE-R",
+    "url": "http://10.1.100.150/redmine/projects/mcx-in-lter/issues",
+    "source": "company"
+  },
+  {
+    "id": 148,
+    "name": "IP-PTT",
+    "url": "http://10.1.100.150/redmine/projects/mcx-in-ipptt/issues",
+    "source": "company"
   }
 ]

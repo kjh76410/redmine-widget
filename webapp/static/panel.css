@@ -1,0 +1,107 @@
+* { box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+    user-select: none;
+    font-family: "Noto Sans KR", "맑은 고딕", sans-serif;
+}
+
+#panel {
+    width: 100%;
+    height: 100%;
+    background: #152340;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+
+#title {
+    color: #E4E9F2;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 14px 16px 8px;
+    flex: none;
+}
+
+#tree {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0 8px 12px;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    height: 38px;
+    padding-right: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #E4E9F2;
+    font-size: 13px;
+}
+
+.row:hover {
+    background: #313F63;
+}
+
+.row .arrow {
+    width: 18px;
+    text-align: center;
+    color: #98A2B8;
+    font-size: 10px;
+    flex: none;
+}
+
+.row .star {
+    width: 20px;
+    text-align: center;
+    color: #6E92C8;
+    font-size: 13px;
+    flex: none;
+    cursor: pointer;
+}
+
+.row .star:hover {
+    color: #89A8D6;
+}
+
+.row .label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.children {
+    overflow: hidden;
+}
+
+.children.collapsed {
+    display: none;
+}
+
+#tree::-webkit-scrollbar {
+    width: 8px;
+}
+
+#tree::-webkit-scrollbar-thumb {
+    background: #6E92C8;
+    border-radius: 4px;
+}
+
+#tree::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.empty {
+    color: #98A2B8;
+    font-size: 12px;
+    padding: 8px 4px;
+}
