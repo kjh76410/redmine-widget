@@ -21,7 +21,7 @@ html, body {
     width: 56px;
     height: 56px;
     min-width: 56px;
-    border-radius: 10px;
+    border-radius: 6px;
     background: #152340;
     display: flex;
     align-items: center;
@@ -61,12 +61,18 @@ html, body {
     transform: translateX(0);
 }
 
+/* shell.js의 pushShapes()가 열림/닫힘 모양을 재려고 툴바를 잠깐 여닫을 때만 쓴다 -
+   그 사이에 transition이 돌면 실제 펼침 애니메이션이 씹힌다. */
+#toolbar.no-anim {
+    transition: none;
+}
+
 .tool-btn {
     position: relative;
     width: 52px;
     height: 52px;
     min-width: 52px;
-    border-radius: 12px;
+    border-radius: 6px;  /* 메인 아이콘(.icon-btn)과 같은 값 - 나란히 놓이니 맞춰야 한다 */
     background: #152340;
     display: flex;
     align-items: center;
