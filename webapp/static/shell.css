@@ -56,7 +56,7 @@ html, body {
 }
 
 #toolbar.open {
-    max-width: 340px;
+    max-width: 400px;
     opacity: 1;
     transform: translateX(0);
 }

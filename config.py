@@ -41,13 +41,14 @@ ICON_RADIUS = 10          # 아이콘 배경 둥근 네모의 모서리 반경(p
 ICON_GLYPH_PAD = 10       # 아이콘 배경 안쪽에서 실제 그림이 차지하는 여백(px, 사방 동일)
 MARGIN      = 20          # 화면 가장자리로부터의 여백(px)
 
-# 메인 아이콘 옆에 뜨는 퀵 툴바(내 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 / 버전별 해결 일감 원형 아이콘 5개) 설정
+# 메인 아이콘 옆에 뜨는 퀵 툴바(내 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 / 버전별 해결 일감 /
+# 팀별 진행상황 원형 아이콘 6개) 설정
 QUICK_TOOLBAR_ICON_SIZE  = 52   # 아이콘 배경(둥근 네모) 한 변 크기(px)
 QUICK_TOOLBAR_RADIUS     = 12   # 아이콘 배경 둥근 네모의 모서리 반경(px) - 메인 아이콘과 비슷한 느낌
 QUICK_TOOLBAR_GLYPH_PAD  = 9    # 배경 안쪽에서 실제 그림이 차지하는 여백(px, 사방 동일) - 메인 아이콘과 비슷한 비율
 QUICK_TOOLBAR_GAP        = 10   # 아이콘 사이 간격(px)
 QUICK_TOOLBAR_MARGIN     = 10   # 메인 아이콘과 퀵 툴바 사이 가로 간격(px)
-QUICK_TOOLBAR_BUTTON_COUNT = 5  # 아이콘 개수(내 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 / 버전별 해결 일감)
+QUICK_TOOLBAR_BUTTON_COUNT = 6  # 아이콘 개수(내 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 / 버전별 해결 일감 / 팀별 진행상황)
 QUICK_TOOLBAR_TOTAL_W = (
     QUICK_TOOLBAR_ICON_SIZE * QUICK_TOOLBAR_BUTTON_COUNT
     + QUICK_TOOLBAR_GAP * (QUICK_TOOLBAR_BUTTON_COUNT - 1)

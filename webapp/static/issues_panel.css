@@ -13,8 +13,8 @@ html, body {
 #win {
     width: 100%;
     height: 100%;
-    background: #ECEAF2;
-    border-radius: 14px;
+    background: #EBF2FC;
+    border-radius: 8px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -31,7 +31,7 @@ html, body {
 }
 
 #title {
-    color: #332C46;
+    color: #172B4D;
     font-size: 14px;
     font-weight: 700;
     padding-top: 8px;
@@ -50,7 +50,7 @@ html, body {
     height: 34px;
     border-radius: 17px;
     background: #FFFFFF;
-    border: 1px solid #D6D2E2;
+    border: 1px solid #DFE1E6;
     display: flex;
     align-items: center;
     padding: 0 14px;
@@ -63,11 +63,28 @@ html, body {
     background: transparent;
     font-size: 12px;
     font-family: inherit;
-    color: #332C46;
+    color: #172B4D;
 }
 
 #searchInput::placeholder {
-    color: #585070;
+    color: #5E6C84;
+}
+
+#searchBtn {
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    margin-left: 8px;
+    background: #5E6C84;
+    -webkit-mask-image: url("assets/icons/search.png");
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: contain;
+    cursor: pointer;
+}
+
+#searchBtn:hover {
+    background: #172B4D;
 }
 
 #filterRow {
@@ -101,14 +118,14 @@ html, body {
 #left {
     width: 30%;
     min-height: 0;
-    background: #F0F0F0;
+    background: #FFFFFF;
     overflow-y: auto;
     padding: 4px 8px 12px;
 }
 
 #divider {
     width: 1px;
-    background: #D6D2E2;
+    background: #DFE1E6;
 }
 
 #right {
@@ -116,11 +133,11 @@ html, body {
     min-height: 0;
     background: #FFFFFF;
     overflow-y: auto;
-    padding: 0;
+    padding: 8px 10px;
 }
 
 .section {
-    color: #585070;
+    color: #5E6C84;
     font-size: 11px;
     font-weight: 700;
     padding: 10px 6px 4px;
@@ -135,18 +152,18 @@ html, body {
     margin: 2px 0;
     border-radius: 8px;
     cursor: pointer;
-    color: #332C46;
+    color: #172B4D;
     font-size: 12px;
     font-weight: 700;
     background: #FFFFFF;
 }
 
 .project-card:hover {
-    background: #DEE1F5;
+    background: #F0F0F0;
 }
 
 .project-card.selected {
-    background: #5C6BC0;
+    background: #0052CC;
     color: #FFFFFF;
 }
 
@@ -163,7 +180,7 @@ html, body {
     height: 20px;
     padding: 0 6px;
     border-radius: 6px;
-    background: #5C6BC0;
+    background: #0052CC;
     color: #FFFFFF;
     font-size: 10px;
     font-weight: 700;
@@ -174,7 +191,7 @@ html, body {
 
 .project-card.selected .count {
     background: #FFFFFF;
-    color: #5C6BC0;
+    color: #0052CC;
 }
 
 .issue-row {
@@ -183,14 +200,13 @@ html, body {
     height: 34px;
     padding: 0 12px;
     cursor: pointer;
-    border-bottom: 1px solid #8C8C8C;
-    color: #332C46;
+    border-bottom: 1px solid #DFE1E6;
+    color: #172B4D;
     font-size: 12px;
-    font-weight: 700;
 }
 
 .issue-row:hover {
-    background: #DEE1F5;
+    background: #DEEBFF;
 }
 
 .pill {
@@ -209,7 +225,7 @@ html, body {
 }
 
 .placeholder {
-    color: #585070;
+    color: #5E6C84;
     font-size: 12px;
     padding: 16px;
 }
@@ -219,7 +235,7 @@ html, body {
 }
 
 #left::-webkit-scrollbar-thumb, #right::-webkit-scrollbar-thumb {
-    background: #6E92C8;
+    background: #0052CC;
     border-radius: 4px;
 }
 

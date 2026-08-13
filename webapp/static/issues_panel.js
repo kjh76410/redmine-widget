@@ -8,7 +8,6 @@ let activeFilter = null;
 let searchMode = false;
 let rightIssuesBase = [];  // 현재 오른쪽에 보여줄 "필터 적용 전" 원본 목록
 let loadingMore = false;
-let searchDebounceTimer = null;
 let searchToken = 0;
 
 const TRACKER_COLORS = {
@@ -190,11 +189,11 @@ function makePill(text, bg, fg) {
     return span;
 }
 
-// ── 검색(디바운스 350ms) ──────────────────────
+// ── 검색(검색 버튼을 눌러야 실행 - 입력 중에는 검색하지 않는다) ──
 const searchInput = document.getElementById("searchInput");
-searchInput.addEventListener("keyup", () => {
-    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
-    searchDebounceTimer = setTimeout(fireSearch, 350);
+document.getElementById("searchBtn").addEventListener("click", fireSearch);
+searchInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") fireSearch();
 });
 
 function fireSearch() {

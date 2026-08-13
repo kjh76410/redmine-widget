@@ -81,9 +81,9 @@ def _apply_geometry(win, width=None, height=None, x=None, y=None, scale_size=Tru
 CARD_BG = {
     "shell.html": "#152340",
     "panel.html": "#152340",
-    "issues_panel.html": "#ECEAF2",
-    "resolved_panel.html": "#F3F1FA",
-    "toast.html": "#233149",
+    "issues_panel.html": "#EBF2FC",
+    "resolved_panel.html": "#EBF2FC",
+    "toast.html": "#EBF2FC",
     "context_menu.html": "#152340",
     "user_id_dialog.html": "#152340",
 }
@@ -154,7 +154,14 @@ def _create_window(title, _scale_size=True, **kwargs):
     _apply_geometry의 scale_size로 그대로 전달된다.
     (before_show 이벤트에서 고치면 더 일찍 고칠 수 있어 보이지만, 그 시점엔 아직
     WebView2 컨트롤 초기화가 안 끝나 있어서 resize/move 호출이 핸들을 깨뜨리고
-    창 생성 자체가 실패하는 경우가 있었다 - loaded까지 기다려야 안전하다.)"""
+    창 생성 자체가 실패하는 경우가 있었다 - loaded까지 기다려야 안전하다.)
+
+    hidden=True로 만들어서 그 틀린 크기 상태로는 아예 화면에 안 그리다가, loaded에서
+    resize/move로 정확한 크기를 맞춘 다음에야 show()한다 - 안 그러면(원래 코드처럼
+    보이는 채로 만들었다가 나중에 고치면) 사용자 눈에 창이 잘못된 크기로 반짝 나타났다가
+    올바른 크기로 훽 줄어드는(또는 커지는) 게 그대로 보인다("내 일감"처럼 큰 패널일수록
+    더 눈에 띈다). 호출부에서 hidden을 따로 넘기면 그 값을 존중한다."""
+    kwargs.setdefault("hidden", True)
     win = webview.create_window(title, **kwargs)
     width, height = kwargs.get("width"), kwargs.get("height")
     x, y = kwargs.get("x"), kwargs.get("y")
@@ -165,7 +172,11 @@ def _create_window(title, _scale_size=True, **kwargs):
     if api is not None:
         api._window = win
 
-    win.events.loaded += lambda: _apply_geometry(win, width, height, x, y, _scale_size)
+    def _reveal():
+        _apply_geometry(win, width, height, x, y, _scale_size)
+        win.show()
+
+    win.events.loaded += _reveal
     return win
 
 
@@ -251,6 +262,9 @@ class Api:
     def open_panel(self, kind):
         self._app.open_panel(kind)
 
+    def close_panel(self):
+        self._app.close_panel()
+
     def open_url(self, url):
         webbrowser.open(url)
 
@@ -296,6 +310,9 @@ class Api:
     def open_toast_url(self, toast_id, url):
         self._app.open_toast_url(toast_id, url)
 
+    def close_toast(self, toast_id):
+        self._app.dismiss_toast(toast_id)
+
 
 class App:
     def __init__(self):
@@ -338,6 +355,8 @@ class App:
         self.panel_kind = None
         self.company_tree = []
         self.team_tree = []
+        self.company_projects_by_id = {}  # id -> {id, parent_id, name, ...} 평면 목록
+        # (내 일감 그룹의 최상위 프로젝트 구분자를 찾는 데 쓴다 - _root_project_name 참고)
 
         self.redmine_user_id = redmine_api.load_redmine_user_id()
         self.my_issues = []
@@ -401,10 +420,13 @@ class App:
     # ── 백그라운드 조회 ──────────────────────────
     def refresh_trees(self):
         def worker_company():
-            tree = redmine_api.build_project_tree(redmine_api.fetch_redmine_projects())
-            self.company_tree = tree
+            projects = redmine_api.fetch_redmine_projects()
+            self.company_projects_by_id = {p["id"]: p for p in projects}
+            self.company_tree = redmine_api.build_project_tree(projects)
             if self.panel_kind == "company_tree":
                 self._push_tree()
+            elif self.panel_kind == "my_issues":
+                self._push_issues()  # 최상위 프로젝트 구분자를 이제서야 알았으면 다시 그린다
 
         def worker_team():
             tree = redmine_api.build_project_tree(redmine_api.fetch_team_redmine_projects())
@@ -505,12 +527,6 @@ class App:
             toast.evaluate_js(f"renderToast({data})")
 
         toast.events.loaded += push
-
-        def auto_dismiss():
-            time.sleep(config.TOAST_DURATION_MS / 1000)
-            self.dismiss_toast(toast_id)
-
-        threading.Thread(target=auto_dismiss, daemon=True).start()
 
     def dismiss_toast(self, toast_id):
         for i, (tid, win) in enumerate(self.toasts):
@@ -680,6 +696,13 @@ class App:
             if kind == "my_issues" and not self.my_issues:
                 self.refresh_my_issues()
 
+    def close_panel(self):
+        """메인 아이콘을 누르면(shell.js의 mainIcon 클릭) 열려있던 카드를 닫는다."""
+        if self.panel is not None:
+            self.panel.destroy()
+            self.panel = None
+            self.panel_kind = None
+
     def _push_tree(self):
         if self.panel is None:
             return
@@ -714,23 +737,42 @@ class App:
         )
         self.panel.evaluate_js(f"renderIssuesPanel({data})")
 
+    def _root_project_name(self, project_id):
+        """company_projects_by_id의 parent_id를 타고 올라가 최상위 프로젝트 이름을
+        찾는다. 아직 프로젝트 목록을 못 받았거나(company_projects_by_id 비어있음)
+        모르는 project_id면 None을 돌려준다 - 호출부에서 그룹 이름으로 대신 채운다."""
+        node = self.company_projects_by_id.get(project_id)
+        if node is None:
+            return None
+        seen = set()
+        while node.get("parent_id") is not None and node["parent_id"] not in seen:
+            parent = self.company_projects_by_id.get(node["parent_id"])
+            if parent is None:
+                break
+            seen.add(node["parent_id"])
+            node = parent
+        return node["name"]
+
     def _my_issues_groups(self):
-        # "[프로젝트명] 제목" 형태인 제목에서 프로젝트명을 뽑아 프로젝트별로 묶는다.
+        # "[프로젝트명] 제목" 형태인 제목에서 프로젝트명을 뽑아 프로젝트별로 묶고,
+        # 그 프로젝트의 최상위 프로젝트를 구분자(section)로 붙인다.
         groups = {}
         order = []
         for issue in self.my_issues:
             m = re.match(r"^\[(.+?)\]\s*(.*)$", issue["title"])
             project_name, subject = (m.group(1), m.group(2)) if m else ("프로젝트 미상", issue["title"])
             if project_name not in groups:
-                groups[project_name] = []
+                section = self._root_project_name(issue.get("project_id")) or project_name
+                groups[project_name] = {"section": section, "issues": []}
                 order.append(project_name)
-            groups[project_name].append({
+            groups[project_name]["issues"].append({
                 "issue_id": issue["issue_id"], "title": subject, "url": issue["url"],
                 "tracker": issue.get("tracker", ""), "priority": issue.get("priority", ""),
             })
+        order.sort(key=lambda p: (groups[p]["section"], p))
         return [
-            {"project": p, "issues": groups[p]}
-            for p in sorted(order)
+            {"project": p, "issues": groups[p]["issues"], "section": groups[p]["section"]}
+            for p in order
         ]
 
     def _favorite_groups(self):

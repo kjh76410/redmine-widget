@@ -246,6 +246,7 @@ def fetch_my_issues(identifier):
             "url": f"{REDMINE_BASE_URL}/issues/{issue_id}",
             "tracker": i.get("tracker", {}).get("name", ""),
             "priority": i.get("priority", {}).get("name", ""),
+            "project_id": i.get("project", {}).get("id"),
         })
     return issues
 
@@ -340,8 +341,8 @@ def search_query_words(query):
 
 def search_project_issues(project_id, query, source="company"):
     """레드마인 자체 검색(/projects/:id/search.json)으로 해당 프로젝트의 이슈를
-    제목뿐 아니라 본문·댓글까지, 완료/닫힌 이슈까지 포함해서 검색한다(레드마인 웹 검색과
-    동일한 결과 범위). source로 전사/팀 레드마인 중 어느 서버에서 검색할지 정한다.
+    "제목"만 대상으로 검색한다(titles_only=1). 완료/닫힌 이슈까지 포함한다.
+    source로 전사/팀 레드마인 중 어느 서버에서 검색할지 정한다.
     실패 시 None을 반환(빈 결과와 구분해 이번 검색은 건너뛰기 위함)."""
     base_url, api_key = redmine_server(source)
     if not api_key or not query:
@@ -352,10 +353,13 @@ def search_project_issues(project_id, query, source="company"):
     # open_issues 파라미터를 아예 안 보내면 레드마인 기본값(열림+닫힘 모두 검색)이 적용된다.
     # all_words=1: 검색어에 공백으로 여러 단어가 있으면 "하나라도 포함(OR)"이 아니라
     # "전부 포함(AND)"인 것만 찾는다(레드마인 웹 검색창의 "All words" 체크와 동일).
+    # titles_only=1: 본문·댓글까지 뒤지면 제목엔 없는 단어가 본문/댓글에만 있어도 걸려서
+    # (검색창은 "제목 검색"이라고 안내하는데) 결과가 제목과 안 맞아 보이는 문제가 있었다 -
+    # 레드마인 웹 검색창의 "Titles only" 체크와 동일하게 제목만 대상으로 좁힌다.
     normalized_query = " ".join(search_query_words(query))
     url = (
         f"{base_url}/projects/{project_id}/search.json"
-        f"?q={urllib.parse.quote(normalized_query)}&issues=1&all_words=1&limit=100"
+        f"?q={urllib.parse.quote(normalized_query)}&issues=1&all_words=1&titles_only=1&limit=100"
     )
     req = urllib.request.Request(url, headers={"X-Redmine-API-Key": api_key})
     try:

@@ -78,6 +78,8 @@ function setPanelOpen(open) {
 }
 
 mainIcon.addEventListener("click", () => {
+    window.pywebview.api.close_panel();  // 열려있는 카드(트리/일감/버전별 해결 일감)를 닫는다
+    window.pywebview.api.close_context_menu();  // 열려있는 우클릭 메뉴도 같이 닫는다
     setPanelOpen(!panelOpen);
 });
 

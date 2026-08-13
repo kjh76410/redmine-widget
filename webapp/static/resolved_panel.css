@@ -13,7 +13,7 @@ html, body {
 #win {
     width: 100%;
     height: 100%;
-    background: #F3F1FA;
+    background: #EBF2FC;
     border-radius: 14px;
     display: flex;
     flex-direction: column;
@@ -23,7 +23,7 @@ html, body {
 
 #title {
     flex: none;
-    color: #38304F;
+    color: #172B4D;
     font-size: 14px;
     font-weight: 700;
     padding: 14px 16px 8px;
@@ -47,7 +47,7 @@ html, body {
 
 .divider {
     width: 1px;
-    background: #DCD5EE;
+    background: #DFE1E6;
 }
 
 .row {
@@ -57,24 +57,24 @@ html, body {
     padding: 0 10px;
     border-radius: 8px;
     cursor: pointer;
-    color: #38304F;
+    color: #172B4D;
     font-size: 12px;
     font-weight: 700;
 }
 
 .row:hover {
-    background: #EAE4F7;
+    background: #DEEBFF;
 }
 
 .row.selected {
-    background: #6B54B0;
+    background: #0052CC;
     color: #FFFFFF;
 }
 
 .row .arrow {
     width: 16px;
     text-align: center;
-    color: #9C90BC;
+    color: #8993A4;
     font-size: 10px;
     flex: none;
 }
@@ -93,7 +93,7 @@ html, body {
     height: 18px;
     padding: 0 5px;
     border-radius: 6px;
-    background: #6B54B0;
+    background: #0052CC;
     color: #FFFFFF;
     font-size: 10px;
     font-weight: 700;
@@ -104,7 +104,7 @@ html, body {
 
 .row.selected .count {
     background: #FFFFFF;
-    color: #6B54B0;
+    color: #0052CC;
 }
 
 .children {
@@ -120,16 +120,16 @@ html, body {
     padding: 8px 10px;
     border-radius: 8px;
     cursor: pointer;
-    color: #38304F;
+    color: #172B4D;
     font-size: 12px;
 }
 
 .issue-row:hover {
-    background: #EAE4F7;
+    background: #DEEBFF;
 }
 
 .placeholder {
-    color: #5E5379;
+    color: #5E6C84;
     font-size: 12px;
     padding: 16px 10px;
 }
@@ -139,7 +139,7 @@ html, body {
 }
 
 .col::-webkit-scrollbar-thumb {
-    background: #6B54B0;
+    background: #0052CC;
     border-radius: 4px;
 }
 
