@@ -6,20 +6,21 @@
 </head>
 <body>
 <div id="win">
-    <div id="header">
-        <div id="title"></div>
-        <div id="searchArea">
-            <div id="searchBox">
-                <input id="searchInput" placeholder="제목 검색...">
-                <div id="searchBtn"></div>
-            </div>
-            <div id="filterRow"></div>
-        </div>
-    </div>
+    <!-- 상단 헤더 없이 창 전체가 좌: 프로젝트 사이드바 / 우: 일감 영역 2단이다 -->
     <div id="body">
         <div id="left"></div>
         <div id="divider"></div>
-        <div id="right"></div>
+        <!-- 오른쪽은 검색란 + 유형 필터 뱃지(둘 다 고정) + 일감 목록(스크롤) 3단 -->
+        <div id="rightPane">
+            <div id="searchArea">
+                <div id="searchBox">
+                    <input id="searchInput" placeholder="제목 검색...">
+                    <div id="searchBtn"></div>
+                </div>
+            </div>
+            <div id="filterRow"></div>
+            <div id="right"></div>
+        </div>
     </div>
 </div>
 <script src="window_shape.js"></script>

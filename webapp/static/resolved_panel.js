@@ -6,7 +6,7 @@ let versionGroups = [];
 let loadToken = 0;
 
 function renderResolvedPanel(data) {
-    document.getElementById("title").textContent = data.title || "버전별 해결 일감";
+    document.getElementById("title").textContent = data.title || "버전별 연결된 일감";
     const col = document.getElementById("colProject");
     col.innerHTML = "";
     selectedProjectRow = null;

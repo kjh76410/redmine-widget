@@ -78,7 +78,7 @@ function setPanelOpen(open) {
 }
 
 mainIcon.addEventListener("click", () => {
-    window.pywebview.api.close_panel();  // 열려있는 카드(트리/일감/버전별 해결 일감)를 닫는다
+    window.pywebview.api.close_panel();  // 열려있는 카드(트리/일감/버전별 연결된 일감)를 닫는다
     window.pywebview.api.close_context_menu();  // 열려있는 우클릭 메뉴도 같이 닫는다
     setPanelOpen(!panelOpen);
 });
@@ -95,7 +95,7 @@ mainIcon.addEventListener("contextmenu", (e) => {
     window.pywebview.api.open_context_menu();
 });
 
-// 파이썬(백그라운드 폴링) → 여기로 "내 일감" 개수 갱신을 알려줄 때 호출
+// 파이썬(백그라운드 폴링) → 여기로 "할당된 일감" 개수 갱신을 알려줄 때 호출
 window.setMyIssuesCount = function (count) {
     const badge = document.getElementById("myIssuesBadge");
     const before = badge.classList.contains("show") ? badge.textContent : "";

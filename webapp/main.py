@@ -1,7 +1,7 @@
 """
 pywebview로 새로 만드는 위젯 셸 - 메인 아이콘 + 퀵 툴바 + 전사/팀 레드마인 프로젝트
-트리(즐겨찾기 추가·해제 포함) + 내 일감/즐겨찾기 프로젝트 2단 창(검색/유형 필터/
-스크롤 더 불러오기 포함) + 버전별 해결 일감 3단 창 + 로그인 아이디 설정 창 + 새 이슈
+트리(즐겨찾기 추가·해제 포함) + 할당된 일감/즐겨찾기 프로젝트 2단 창(검색/유형 필터/
+스크롤 더 불러오기 포함) + 버전별 연결된 일감 3단 창 + 로그인 아이디 설정 창 + 새 이슈
 토스트 알림까지 구현했다. 패널은 전부 self.panel 슬롯 하나를 재사용해서 위젯 아이콘
 바로 위, 같은 자리에만 뜬다(따로 팝업 안 튐). config.py/redmine_api.py는 기존
 Tkinter 버전과 그대로 공유한다(순수 데이터 계층이라 프레임워크에 안 묶여 있음).
@@ -159,7 +159,7 @@ def _create_window(title, _scale_size=True, **kwargs):
     hidden=True로 만들어서 그 틀린 크기 상태로는 아예 화면에 안 그리다가, loaded에서
     resize/move로 정확한 크기를 맞춘 다음에야 show()한다 - 안 그러면(원래 코드처럼
     보이는 채로 만들었다가 나중에 고치면) 사용자 눈에 창이 잘못된 크기로 반짝 나타났다가
-    올바른 크기로 훽 줄어드는(또는 커지는) 게 그대로 보인다("내 일감"처럼 큰 패널일수록
+    올바른 크기로 훽 줄어드는(또는 커지는) 게 그대로 보인다("할당된 일감"처럼 큰 패널일수록
     더 눈에 띈다). 호출부에서 hidden을 따로 넘기면 그 값을 존중한다."""
     kwargs.setdefault("hidden", True)
     win = webview.create_window(title, **kwargs)
@@ -225,19 +225,20 @@ TREE_TITLES = {
     "team_tree": "팀 레드마인",
 }
 ISSUES_TITLES = {
-    "my_issues": "내 일감",
+    "my_issues": "할당된 일감",
     "favorites": "즐겨찾기 프로젝트",
 }
-RESOLVED_TITLE = "버전별 해결 일감"
+RESOLVED_TITLE = "버전별 연결된 일감"
 SECTION_LABEL = {"company": "레드마인(150)", "team": "레드마인(20)"}
 SECTION_ORDER = {"company": 0, "team": 1}
 
 # kind -> (템플릿 파일, 창 너비, 창 높이)
 PANEL_SPEC = {
-    "company_tree": ("panel.html", 300, 640),
-    "team_tree": ("panel.html", 300, 640),
-    "my_issues": ("issues_panel.html", 800, 760),
-    "favorites": ("issues_panel.html", 800, 760),
+    "company_tree": ("panel.html", 300, 680),
+    "team_tree": ("panel.html", 300, 680),
+    # 일감/즐겨찾기/연결된 일감 세 창은 같은 크기로 맞춰 둔다(툴바에서 서로 오갈 때 창이 안 흔들리게)
+    "my_issues": ("issues_panel.html", 1000, 680),
+    "favorites": ("issues_panel.html", 1000, 680),
     "resolved_by_version": ("resolved_panel.html", 1000, 680),
 }
 
@@ -304,6 +305,9 @@ class Api:
     def toggle_favorite(self, project_id, name, url, source):
         return self._app.toggle_favorite(project_id, name, url, source)
 
+    def toggle_notify(self, project_id, source):
+        return self._app.toggle_notify(project_id, source)
+
     def get_resolved_by_version(self, project_id):
         return self._app.get_resolved_by_version(project_id)
 
@@ -356,7 +360,7 @@ class App:
         self.company_tree = []
         self.team_tree = []
         self.company_projects_by_id = {}  # id -> {id, parent_id, name, ...} 평면 목록
-        # (내 일감 그룹의 최상위 프로젝트 구분자를 찾는 데 쓴다 - _root_project_name 참고)
+        # (할당된 일감 그룹의 최상위 프로젝트 구분자를 찾는 데 쓴다 - _root_project_name 참고)
 
         self.redmine_user_id = redmine_api.load_redmine_user_id()
         self.my_issues = []
@@ -365,7 +369,7 @@ class App:
         self.favorite_issue_totals = {}  # f"{source}:{id}" -> 전체 이슈 개수
 
         self.user_id_dialog = None
-        self._pending_my_issues_open = False  # 아이디 설정 후 "내 일감"을 이어서 열지 여부
+        self._pending_my_issues_open = False  # 아이디 설정 후 "할당된 일감"을 이어서 열지 여부
         self.context_menu = None
 
         self.seen_issue_ids = redmine_api.load_seen_issues()  # 즐겨찾기별로 이미 알린 이슈 id
@@ -476,7 +480,9 @@ class App:
         threading.Thread(target=loop, daemon=True).start()
 
     def _check_new_issues(self):
-        favorites_snapshot = list(self.favorites)
+        # 알림을 끈 프로젝트(notify=False)는 아예 조회도 안 한다. 키가 없는 기존
+        # 즐겨찾기는 켜짐으로 본다(예전에 저장된 파일도 그대로 동작하게).
+        favorites_snapshot = [f for f in self.favorites if f.get("notify", True)]
         if not favorites_snapshot:
             return
         new_issues = []  # [(project_name, issue), ...]
@@ -614,7 +620,18 @@ class App:
             self._push_issues()
         return self.is_favorite(project_id, source)
 
-    # ── "내 일감" 조회용 로그인 아이디 설정 ──────
+    def toggle_notify(self, project_id, source):
+        """즐겨찾기 프로젝트의 새 이슈 알림을 켜고 끈다(_check_new_issues가 이 값을 본다).
+        반환값은 바뀐 뒤의 상태. 목록 전체를 다시 그릴 필요는 없어서 _push_issues는 안 한다."""
+        project_id = int(project_id)
+        for f in self.favorites:
+            if f["id"] == project_id and f.get("source", "company") == source:
+                f["notify"] = not f.get("notify", True)
+                redmine_api.save_favorites(self.favorites)
+                return f["notify"]
+        return True
+
+    # ── "할당된 일감" 조회용 로그인 아이디 설정 ──────
     def open_user_id_dialog(self):
         if self.user_id_dialog is not None:
             self.user_id_dialog.destroy()
@@ -722,7 +739,7 @@ class App:
         self.panel.evaluate_js(f"renderResolvedPanel({data})")
 
     def get_resolved_by_version(self, project_id):
-        return redmine_api.fetch_resolved_issues_by_version(project_id)
+        return redmine_api.fetch_issues_by_version(project_id)
 
     def _push_issues(self):
         if self.panel is None:
@@ -787,6 +804,7 @@ class App:
                 "_order": SECTION_ORDER.get(source, 99),
                 "project_id": f["id"],
                 "source": source,
+                "notify": f.get("notify", True),
                 "total": self.favorite_issue_totals.get(key, len(issues)),
             }
 

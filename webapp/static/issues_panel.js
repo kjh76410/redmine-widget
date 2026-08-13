@@ -31,7 +31,6 @@ const PRIORITY_COLORS = {
 
 function renderIssuesPanel(data) {
     currentKind = data.kind;
-    document.getElementById("title").textContent = data.title;
     currentGroups = data.groups || [];
     selectedIndex = -1;
     activeFilter = null;
@@ -46,12 +45,11 @@ function renderIssuesPanel(data) {
 function renderFilterRow() {
     const row = document.getElementById("filterRow");
     row.innerHTML = "";
+    // 색은 CSS(.filter-btn)에서만 준다 - 뱃지는 회색, 고른 것만 강조색.
+    // 유형별 고유색(TRACKER_COLORS)은 일감 목록의 뱃지에만 쓰고 여기선 이름만 가져다 쓴다.
     Object.keys(TRACKER_COLORS).forEach((name) => {
-        const [bg, fg] = TRACKER_COLORS[name];
         const btn = document.createElement("button");
         btn.className = "filter-btn" + (name === activeFilter ? " active" : "");
-        btn.style.background = bg;
-        btn.style.color = fg;
         btn.textContent = name;
         btn.addEventListener("click", () => {
             activeFilter = activeFilter === name ? null : name;
@@ -88,6 +86,9 @@ function renderLeft() {
         count.textContent = String(g.total != null ? g.total : g.issues.length);
         card.appendChild(name);
         card.appendChild(count);
+        if (g.project_id != null && g.notify != null) {
+            card.appendChild(makeBell(g));
+        }
         card.addEventListener("click", () => {
             searchMode = false;
             selectedIndex = i;
@@ -97,6 +98,27 @@ function renderLeft() {
         });
         left.appendChild(card);
     });
+}
+
+// 즐겨찾기 프로젝트 카드 오른쪽의 종 - 그 프로젝트의 새 이슈 토스트 알림을 켜고 끈다
+// (파이썬 App._check_new_issues가 이 값을 보고 조회 대상에서 뺀다).
+function makeBell(group) {
+    const bell = document.createElement("span");
+
+    function paint() {
+        bell.className = "bell " + (group.notify ? "on" : "off");
+        bell.title = group.notify ? "새 일감 알림 켜짐 - 누르면 끕니다" : "새 일감 알림 꺼짐 - 누르면 켭니다";
+    }
+    paint();
+
+    bell.addEventListener("click", (event) => {
+        event.stopPropagation();  // 카드 클릭(프로젝트 선택)까지 같이 먹지 않게
+        window.pywebview.api.toggle_notify(group.project_id, group.source).then((on) => {
+            group.notify = on;
+            paint();
+        });
+    });
+    return bell;
 }
 
 function filteredIssues() {
