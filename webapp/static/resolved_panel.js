@@ -86,6 +86,9 @@ function selectProject(node, row) {
         if (token !== loadToken) return;  // 그 사이 다른 프로젝트를 눌렀으면 버림
         versionGroups = groups || [];
         renderVersionCol();
+    }).catch((err) => {
+        if (token !== loadToken) return;
+        renderPlaceholder("colVersion", "불러오기 실패: " + String(err));
     });
 }
 

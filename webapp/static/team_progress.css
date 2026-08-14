@@ -1,0 +1,270 @@
+* { box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+    user-select: none;
+    font-family: "Noto Sans KR", "맑은 고딕", sans-serif;
+}
+
+#win {
+    width: 100%;
+    height: 100%;
+    background: #EBF2FC;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+#title {
+    flex: none;
+    color: #172B4D;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 14px 16px 8px;
+}
+
+#cols {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+}
+
+.col {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 4px 8px 12px;
+}
+
+#colTeam { width: 190px; flex: none; }
+#colVersion { flex: 1; }
+
+.divider {
+    width: 1px;
+    background: #DFE1E6;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    height: 36px;
+    padding: 0 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #172B4D;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.row:hover {
+    background: #DEEBFF;
+}
+
+.row.selected {
+    background: #0052CC;
+    color: #FFFFFF;
+}
+
+.row .label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.row .arrow {
+    width: 16px;
+    text-align: center;
+    color: #8993A4;
+    font-size: 10px;
+    flex: none;
+}
+
+.children {
+    overflow: hidden;
+}
+
+.children.collapsed {
+    display: none;
+}
+
+/* 왼쪽에서 고른 최상위 프로젝트(회사/조직 단위) 밑의 팀 하나당 섹션 하나 - 최상위
+   프로젝트 자체는 팀이 아니라서, 여러 팀의 로드맵이 이 안에 세로로 쌓인다. */
+.team-section.with-divider {
+    border-top: 1px solid #DFE1E6;
+    margin-top: 16px;
+    padding-top: 10px;
+}
+
+.team-heading {
+    color: #172B4D;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 2px 0 10px 10px;
+    margin-bottom: 2px;
+    border-left: 3px solid #0052CC;  /* 팀 섹션의 시작을 눈에 띄는 파란 표식으로 - 앱 포인트색과 통일 */
+}
+
+/* 팀(depth 1) 섹션 안에서 depth 2 프로젝트마다 나뉘는 소그룹 - team-section보다
+   옅은 구분으로 한 단계 더 얕은 구분임을 나타낸다. */
+.subgroup.with-divider {
+    margin-top: 14px;
+}
+
+.subgroup-heading {
+    display: inline-block;
+    color: #5E6C84;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 9px;
+    margin: 0 0 6px 10px;
+    border-radius: 9px;
+    background: #E4E9F2;  /* 옅은 태그 형태 - team-heading보다 눈에 덜 띄게 */
+}
+
+/* 올해(1월~12월) 마감인 버전들의 Month 축 로드맵 - 엑셀처럼 달마다 네모 칸을 두고,
+   진행 기간에 해당하는 칸을 색칠한다. 레드마인 버전엔 시작일 필드가 없어서, 그
+   버전이 만들어진 날(created_on)을 시작으로, 마감일(due_date)을 끝으로 근사한다
+   (redmine_api.fetch_team_progress 설명 참고). 일감 목록/진행률 막대로 더 들어가는
+   기능은 없다 - 이 화면은 간트차트로 무엇이 진행 중인지만 훑어보는 용도다. */
+.gantt-header {
+    display: flex;
+}
+
+.gantt-header .label-spacer {
+    width: 220px;  /* 버전명 평균 길이(약 21자) 기준 - 길면 잘리는 대신 그만큼 그리드가 넓어진다 */
+    flex: none;
+}
+
+.gantt-header .months {
+    flex: 1;
+    display: flex;
+    min-width: 0;
+    border: 1px solid #DFE1E6;
+    border-radius: 6px;
+    overflow: hidden;  /* 첫/마지막 칸이 바깥 테두리 둥근 모서리를 따라가게 */
+}
+
+.gantt-header .months span {
+    flex: 1;
+    text-align: center;
+    color: #5E6C84;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 0;
+    border-right: 1px solid #DFE1E6;
+    background: #F4F6F9;
+}
+
+.gantt-header .months span:last-child {
+    border-right: none;
+}
+
+/* 오늘이 속한 달 - 지금이 로드맵 어디쯤인지 한눈에 보이게 */
+.gantt-header .months span.current {
+    color: #0052CC;
+    background: #DEEBFF;
+}
+
+.gantt-row {
+    display: flex;
+    align-items: center;
+    height: 27px;
+    border-radius: 5px;
+    padding: 0 2px;
+    margin: 0 -2px;
+}
+
+.gantt-row:hover {
+    background: #EDF3FC;  /* 클릭 기능은 없지만, 가로로 훑어볼 때 어느 행인지 놓치지 않게 */
+}
+
+.gantt-row .label {
+    width: 220px;  /* 버전명 평균 길이(약 21자) 기준 - 길면 잘리는 대신 그만큼 그리드가 넓어진다 */
+    flex: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #172B4D;
+    font-size: 11px;
+    font-weight: 700;
+    padding-right: 4px;
+}
+
+.gantt-row .label.clickable {
+    cursor: pointer;
+}
+
+.gantt-row .label.clickable:hover {
+    color: #0052CC;
+    text-decoration: underline;
+}
+
+.gantt-row .cells {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    height: 20px;
+    border: 1px solid #DFE1E6;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.month-cell {
+    flex: 1;
+    height: 100%;
+    background: #FFFFFF;
+    border-right: 1px solid #EEF0F4;  /* 안쪽 눈금은 아주 옅게 - 시선을 막대색에 집중시킨다 */
+}
+
+.month-cell:last-child {
+    border-right: none;
+}
+
+.month-cell.current {
+    background: #F1F6FF;  /* 채워지지 않은 칸일 때만 - 오늘이 속한 달 눈금 강조 */
+}
+
+.month-cell.filled {
+    background: #0052CC;  /* 앱 전반의 포인트색과 통일 - 진행 중 */
+    border-right-color: transparent;  /* 막대가 칸 경계 없이 하나로 이어져 보이게 */
+}
+
+.month-cell.filled.done {
+    background: #1F7A63;  /* 100% 완료된 버전은 초록으로 구분(트래커 뱃지 초록과 동일 톤) */
+}
+
+.month-cell.filled.range-start {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+
+.month-cell.filled.range-end {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.placeholder {
+    color: #5E6C84;
+    font-size: 12px;
+    padding: 16px 10px;
+}
+
+.col::-webkit-scrollbar {
+    width: 8px;
+}
+
+.col::-webkit-scrollbar-thumb {
+    background: #0052CC;
+    border-radius: 4px;
+}
+
+.col::-webkit-scrollbar-track {
+    background: transparent;
+}

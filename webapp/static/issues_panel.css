@@ -70,6 +70,29 @@ html, body {
     background: #172B4D;
 }
 
+/* 즐겨찾기 검색을 즐겨찾기 프로젝트로 좁힐지, 전체 프로젝트로 넓힐지 고르는 토글
+   ("할당된 일감" 창에서는 의미가 없어 renderIssuesPanel이 kind에 따라 숨긴다) */
+#allProjectsToggle {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    font-size: 11px;
+    color: #5E6C84;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+}
+
+#allProjectsToggle input {
+    cursor: pointer;
+}
+
+#allProjectsToggle.hidden {
+    display: none;
+}
+
 /* 유형 필터 뱃지 - 검색란과 일감 목록 사이(#rightPane 참고) */
 #filterRow {
     flex: none;
@@ -177,6 +200,25 @@ html, body {
     white-space: nowrap;
 }
 
+/* 즐겨찾기 창 왼쪽 목록의 별 - 누르면 해제(panel.js 트리의 별과 같은 문자, 색만 이 창의
+   밝은 배경에 맞춘다) */
+.fav-star {
+    flex: none;
+    margin-right: 6px;
+    font-size: 13px;
+    line-height: 1;
+    color: #F2A93B;
+    cursor: pointer;
+}
+
+.fav-star:hover {
+    color: #D98C0A;
+}
+
+.project-card.selected .fav-star {
+    color: #FFD966;
+}
+
 /* 즐겨찾기 프로젝트의 새 이슈 알림 on/off 토글. 아이콘은 PNG 대신 인라인 SVG를
    마스크로 쓴다 - 색을 CSS에서 상태별로 바꿀 수 있고, 에셋 파일이 안 늘어난다.
    (bundle_html은 assets/icons/*.png 참조만 인라인화하므로 data URI는 그대로 통과) */
@@ -262,6 +304,18 @@ html, body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* 검색 결과에서 검색어 강조 */
+.issue-text mark {
+    background: #FFE9A8;
+    color: #172B4D;
+    border-radius: 3px;
+    padding: 0 1px;
+}
+
+.issue-row:hover .issue-text mark {
+    background: #FFDD7A;
 }
 
 .placeholder {

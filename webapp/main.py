@@ -83,6 +83,7 @@ CARD_BG = {
     "panel.html": "#152340",
     "issues_panel.html": "#EBF2FC",
     "resolved_panel.html": "#EBF2FC",
+    "team_progress.html": "#EBF2FC",
     "toast.html": "#EBF2FC",
     "context_menu.html": "#152340",
     "user_id_dialog.html": "#152340",
@@ -229,6 +230,7 @@ ISSUES_TITLES = {
     "favorites": "즐겨찾기 프로젝트",
 }
 RESOLVED_TITLE = "버전별 연결된 일감"
+TEAM_PROGRESS_TITLE = "팀별 진행상황"
 SECTION_LABEL = {"company": "레드마인(150)", "team": "레드마인(20)"}
 SECTION_ORDER = {"company": 0, "team": 1}
 
@@ -236,10 +238,13 @@ SECTION_ORDER = {"company": 0, "team": 1}
 PANEL_SPEC = {
     "company_tree": ("panel.html", 300, 680),
     "team_tree": ("panel.html", 300, 680),
-    # 일감/즐겨찾기/연결된 일감 세 창은 같은 크기로 맞춰 둔다(툴바에서 서로 오갈 때 창이 안 흔들리게)
-    "my_issues": ("issues_panel.html", 1000, 680),
-    "favorites": ("issues_panel.html", 1000, 680),
-    "resolved_by_version": ("resolved_panel.html", 1000, 680),
+    # 일감/즐겨찾기/연결된 일감/팀별 진행상황 네 창은 같은 크기로 맞춰 둔다(툴바에서
+    # 서로 오갈 때 창이 안 흔들리게) - 팀별 진행상황의 Month 그리드 자리를 넓히려고
+    # 네 창 다 1000 -> 1100으로 같이 늘렸다.
+    "my_issues": ("issues_panel.html", 1100, 680),
+    "favorites": ("issues_panel.html", 1100, 680),
+    "resolved_by_version": ("resolved_panel.html", 1100, 680),
+    "team_progress": ("team_progress.html", 1100, 680),
 }
 
 
@@ -296,8 +301,8 @@ class Api:
     def set_shell_shape(self, state, rects, dpr):
         self._app.set_shell_shape(state, rects, dpr)
 
-    def search_issues(self, kind, query):
-        return self._app.search_issues(kind, query)
+    def search_issues(self, kind, query, all_projects=False):
+        return self._app.search_issues(kind, query, all_projects)
 
     def load_more_issues(self, project_id, source, offset):
         return self._app.load_more_issues(project_id, source, offset)
@@ -310,6 +315,9 @@ class Api:
 
     def get_resolved_by_version(self, project_id):
         return self._app.get_resolved_by_version(project_id)
+
+    def get_team_progress(self, project_id):
+        return self._app.get_team_progress(project_id)
 
     def open_toast_url(self, toast_id, url):
         self._app.open_toast_url(toast_id, url)
@@ -554,7 +562,7 @@ class App:
         webbrowser.open(url)
         self.dismiss_toast(toast_id)
 
-    def search_issues(self, kind, query):
+    def search_issues(self, kind, query, all_projects=False):
         query = (query or "").strip()
         if not query:
             return []
@@ -569,6 +577,8 @@ class App:
                 if all(w in issue["title"].lower() for w in words)
             ]
         if kind == "favorites":
+            if all_projects:
+                return self._search_all_projects(query)
             matches = []
             for f in self.favorites:
                 source = f.get("source", "company")
@@ -584,9 +594,28 @@ class App:
                         "title": f"[{f['name']}] {r['title']}",
                         "tracker": cached.get("tracker", "") if cached else "",
                         "priority": cached.get("priority", "") if cached else "",
+                        "source_label": SECTION_LABEL.get(source, source),
                     })
             return matches
         return []
+
+    def _search_all_projects(self, query):
+        """즐겨찾기로 좁히지 않고 전사/팀 레드마인 두 서버 전체 프로젝트를 대상으로 검색한다
+        (redmine_api.search_all_projects_issues, 서버당 한 번의 요청). API 키가 없는 서버는
+        결과가 None이라 조용히 건너뛴다."""
+        matches = []
+        for source in ("company", "team"):
+            results = redmine_api.search_all_projects_issues(query, source)
+            if not results:
+                continue
+            for r in results:
+                matches.append({
+                    "issue_id": r["issue_id"], "url": r["url"],
+                    "title": f"[{r.get('project_name', '')}] {r['title']}",
+                    "tracker": r.get("tracker", ""), "priority": r.get("priority", ""),
+                    "source_label": SECTION_LABEL.get(source, source),
+                })
+        return matches
 
     def load_more_issues(self, project_id, source, offset):
         more, total = redmine_api.fetch_project_issue_list(project_id, source, offset=offset)
@@ -708,6 +737,8 @@ class App:
             self.panel.events.loaded += self._push_tree
         elif kind == "resolved_by_version":
             self.panel.events.loaded += self._push_resolved_tree
+        elif kind == "team_progress":
+            self.panel.events.loaded += self._push_team_progress_tree
         else:
             self.panel.events.loaded += self._push_issues
             if kind == "my_issues" and not self.my_issues:
@@ -739,7 +770,60 @@ class App:
         self.panel.evaluate_js(f"renderResolvedPanel({data})")
 
     def get_resolved_by_version(self, project_id):
-        return redmine_api.fetch_issues_by_version(project_id)
+        return redmine_api.fetch_resolved_issues_by_version(project_id)
+
+    def _push_team_progress_tree(self):
+        if self.panel is None:
+            return
+        # 왼쪽 목록은 전사 레드마인 최상위(루트) 프로젝트("Cybertel Bridge" 같은 회사/
+        # 조직 단위) 그대로 쓴다. 실제 "팀"은 최상위가 아니라 대체로 그 바로 아래
+        # 자식 프로젝트다(예: Cybertel Bridge 밑의 "MCX솔루션 개발팀", "기구팀" 등) -
+        # 그래서 최상위를 고르면 get_team_progress가 자식 단위로 쪼개서 보여준다.
+        data = json.dumps({"title": TEAM_PROGRESS_TITLE, "teams": self.company_tree}, ensure_ascii=False)
+        self.panel.evaluate_js(f"renderTeamProgressPanel({data})")
+
+    def get_team_progress(self, project_id):
+        """왼쪽 트리에서 고른 게 최상위(루트) 프로젝트면 그 바로 아래 depth 1 자식
+        (팀)마다 섹션을 나누고, 각 팀 섹션 안에서 다시 그 팀의 depth 2 자식 프로젝트별로
+        구분해서 보여준다 - 실제 "팀"은 최상위가 아니라 그 한 단계 아래 단위인 경우가
+        많고(_push_team_progress_tree 설명 참고), 팀 밑에도 "국내 프로젝트"/"해외
+        프로젝트"처럼 성격이 다른 하위 프로젝트가 섞여 있어서, depth 2까지 나눠야 어떤
+        프로젝트 진행 상황인지 한눈에 구분된다. 고른 게 depth 1(팀 자신)이면 팀 하나에
+        대해서만 depth 2로 나눠 보여준다. depth 2 자식이 없는 팀/프로젝트는 자기 자신
+        하나를 그 depth 2 그룹으로 취급한다.
+        반환 형식: [{"team": str, "team_id": int,
+                     "subgroups": [{"team": str, "team_id": int, "versions": [...]}, ...]},
+                    ...]
+        (subgroups 안의 "versions"는 fetch_team_progress 반환값과 동일)"""
+        project_id = int(project_id)
+        root = next((n for n in self.company_tree if n["id"] == project_id), None)
+        if root is not None:
+            team_nodes = root.get("children") or [root]
+        else:
+            team_nodes = None
+            for r in self.company_tree:
+                child = next((c for c in r.get("children", []) if c["id"] == project_id), None)
+                if child is not None:
+                    team_nodes = [child]
+                    break
+            if team_nodes is None:
+                return []
+
+        # 팀(depth 1)마다 순서대로 조회하면 팀 개수만큼 시간이 곱해져 너무 느려지므로,
+        # 모든 팀의 depth 2 자식을 한 평평한 목록으로 모아 한 번에 병렬 조회한 뒤
+        # 팀별로 다시 묶는다.
+        flat = []  # [(project_id, name, team_index), ...]
+        for team_index, team_node in enumerate(team_nodes):
+            sub_children = team_node.get("children") or [team_node]
+            for c in sub_children:
+                flat.append((c["id"], c["name"], team_index))
+
+        flat_results = redmine_api.fetch_org_progress([(pid, name) for pid, name, _ in flat])
+
+        result = [{"team": t["name"], "team_id": t["id"], "subgroups": []} for t in team_nodes]
+        for (_pid, _name, team_index), r in zip(flat, flat_results):
+            result[team_index]["subgroups"].append(r)
+        return result
 
     def _push_issues(self):
         if self.panel is None:
@@ -804,6 +888,7 @@ class App:
                 "_order": SECTION_ORDER.get(source, 99),
                 "project_id": f["id"],
                 "source": source,
+                "url": f.get("url", ""),
                 "notify": f.get("notify", True),
                 "total": self.favorite_issue_totals.get(key, len(issues)),
             }
