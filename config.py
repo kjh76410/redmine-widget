@@ -41,14 +41,17 @@ ICON_RADIUS = 10          # 아이콘 배경 둥근 네모의 모서리 반경(p
 ICON_GLYPH_PAD = 10       # 아이콘 배경 안쪽에서 실제 그림이 차지하는 여백(px, 사방 동일)
 MARGIN      = 20          # 화면 가장자리로부터의 여백(px)
 
-# 메인 아이콘 옆에 뜨는 퀵 툴바(내 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 / 버전별 해결 일감 /
+# 메인 아이콘 옆에 뜨는 퀵 툴바(할당된 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 / 버전별 연결된 일감 /
 # 팀별 진행상황 원형 아이콘 6개) 설정
-QUICK_TOOLBAR_ICON_SIZE  = 52   # 아이콘 배경(둥근 네모) 한 변 크기(px)
+# 아이콘 칸 크기/간격은 shell.css와 같은 값이어야 한다 - 셸 창 너비를 이 값들로 계산하는데,
+# 창 사각형이 곧 눈에 보이는 바라서 어긋나면 빈 남색이 붙거나 마지막 아이콘이 잘린다
+# (webapp/main.py의 _round_window_corners / App.shell_w 설명 참고).
+QUICK_TOOLBAR_ICON_SIZE  = 56   # 아이콘 칸 한 변 크기(px) - 메인 아이콘과 같은 크기로 바에 이어 붙는다
 QUICK_TOOLBAR_RADIUS     = 12   # 아이콘 배경 둥근 네모의 모서리 반경(px) - 메인 아이콘과 비슷한 느낌
 QUICK_TOOLBAR_GLYPH_PAD  = 9    # 배경 안쪽에서 실제 그림이 차지하는 여백(px, 사방 동일) - 메인 아이콘과 비슷한 비율
-QUICK_TOOLBAR_GAP        = 10   # 아이콘 사이 간격(px)
-QUICK_TOOLBAR_MARGIN     = 10   # 메인 아이콘과 퀵 툴바 사이 가로 간격(px)
-QUICK_TOOLBAR_BUTTON_COUNT = 6  # 아이콘 개수(내 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 / 버전별 해결 일감 / 팀별 진행상황)
+QUICK_TOOLBAR_GAP        = 0    # 아이콘 사이 간격(px) - 0(빈틈없이 이어진 바)
+QUICK_TOOLBAR_MARGIN     = 0    # 메인 아이콘과 퀵 툴바 사이 가로 간격(px) - 0(같은 바 안이라 붙는다)
+QUICK_TOOLBAR_BUTTON_COUNT = 6  # 아이콘 개수(할당된 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 / 버전별 연결된 일감 / 팀별 진행상황)
 QUICK_TOOLBAR_TOTAL_W = (
     QUICK_TOOLBAR_ICON_SIZE * QUICK_TOOLBAR_BUTTON_COUNT
     + QUICK_TOOLBAR_GAP * (QUICK_TOOLBAR_BUTTON_COUNT - 1)
@@ -82,9 +85,9 @@ SHADOW_COLOR = "#061431"  # 카드 아래에 깔리는 그림자색 (어두운 �
 SHADOW_OFFSET = 3         # 그림자 오프셋(px)
 PANEL_BG    = ICON_BUTTON_BG   # 패널 배경색 - 메인 아이콘과 같은 남색
 FLYOUT_W    = 300         # 플라이아웃 패널 너비(px, 전사 프로젝트/즐겨찾기 공용)
-MY_ISSUES_FLYOUT_W = 460  # "내 일감" 플라이아웃 너비(px) - 이슈 제목이 길어서 더 넓게
+MY_ISSUES_FLYOUT_W = 460  # "할당된 일감" 플라이아웃 너비(px) - 이슈 제목이 길어서 더 넓게
 PANEL_GAP   = 6           # 패널/플라이아웃 사이 가로 간격(px)
-WIDGET_WINDOW_H = 760     # "내 일감"/"즐겨찾기 프로젝트" 창 높이 - 전사 프로젝트 플라이아웃도 높이를 여기에 맞춤
+WIDGET_WINDOW_H = 760     # "할당된 일감"/"즐겨찾기 프로젝트" 창 높이 - 전사 프로젝트 플라이아웃도 높이를 여기에 맞춤
 GO_ZONE_W   = 26          # 하위 항목이 있는 뱃지 오른쪽 끝의 "바로 이동" 버튼 클릭 영역 너비(px)
 GO_ICON_SIZE = 16         # "바로 이동" 버튼 아이콘 크기(px)
 GO_ICON_FILE = Path(__file__).parent / "assets" / "icons" / "go.png"
@@ -137,7 +140,7 @@ REDMINE_API_KEY_PLACEHOLDER = "PUT_YOUR_API_KEY_HERE"
 TEAM_REDMINE_BASE_URL = "http://10.1.100.20"
 TEAM_REDMINE_API_KEY_FILE = Path(__file__).parent / "team_redmine_api_key.txt"
 
-# "내 일감" 목록 조회에 쓸 레드마인 사용자 ID(숫자)가 저장되는 파일 (앱을 다시 실행해도 유지됨)
+# "할당된 일감" 목록 조회에 쓸 레드마인 사용자 ID(숫자)가 저장되는 파일 (앱을 다시 실행해도 유지됨)
 REDMINE_USER_ID_FILE = Path(__file__).parent / "redmine_user_id.txt"
 
 

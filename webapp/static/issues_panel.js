@@ -295,9 +295,11 @@ document.getElementById("allProjectsCheck").addEventListener("change", () => {
     if (searchInput.value.trim()) fireSearch();  // 검색 중이면 토글 즉시 반영
 });
 
+// "12345" 또는 "#12345"처럼 번호만 친 경우.
+const ISSUE_NUMBER_RE = /^#?\s*(\d+)$/;
+
 function fireSearch() {
     const query = searchInput.value.trim();
-    const allProjects = document.getElementById("allProjectsCheck").checked;
     const token = ++searchToken;
     if (!query) {
         searchMode = false;
@@ -306,6 +308,30 @@ function fireSearch() {
         renderRight();
         return;
     }
+
+    // 번호만 쳤으면 그 이슈로 바로 이동한다. 그런 번호의 이슈가 없으면(또는 볼 권한이
+    // 없으면) 평소대로 제목 검색으로 넘어가므로, 제목에 든 숫자를 찾는 것도 계속 된다.
+    const match = query.match(ISSUE_NUMBER_RE);
+    if (match) {
+        document.getElementById("right").innerHTML =
+            `<div class="placeholder">#${match[1]} 여는 중...</div>`;
+        window.pywebview.api.open_issue_by_id(Number(match[1])).then((issue) => {
+            if (token !== searchToken) return;
+            if (issue) {
+                document.getElementById("right").innerHTML =
+                    `<div class="placeholder">#${issue.issue_id} 을(를) 브라우저에서 열었습니다.</div>`;
+            } else {
+                runTitleSearch(query, token);  // 그런 번호가 없다 - 제목 검색으로
+            }
+        }).catch(() => runTitleSearch(query, token));
+        return;
+    }
+
+    runTitleSearch(query, token);
+}
+
+function runTitleSearch(query, token) {
+    const allProjects = document.getElementById("allProjectsCheck").checked;
     document.getElementById("right").innerHTML = '<div class="placeholder">검색 중...</div>';
     try {
         window.pywebview.api.search_issues(currentKind, query, allProjects).then((matches) => {

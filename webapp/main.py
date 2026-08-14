@@ -11,7 +11,6 @@ import base64
 import ctypes
 import functools
 import json
-import math
 import re
 import sys
 import threading
@@ -25,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import config
 import redmine_api
+import widget_state
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 ICONS_DIR = STATIC_DIR / "assets" / "icons"
@@ -74,10 +74,10 @@ def _apply_geometry(win, width=None, height=None, x=None, y=None, scale_size=Tru
         win.move(round(x / _DPI_SCALE), round(y / _DPI_SCALE))
 
 
-# 창별 배경색 - 각 CSS에서 창을 꽉 채우는 카드(#panel/#win/#toast, 셸은 버튼)의
-# background와 같은 값이어야 한다. 아래 _set_window_shape 설명 참고: 창을 카드 모양대로
-# 잘라내도 (1) 페이지가 그려지기 전 한순간과 (2) 둥근 모서리 안티에일리어싱 가장자리는
-# 이 색이 깔리기 때문에, 카드 색과 같아야 티가 안 난다.
+# 창별 배경색 - 각 CSS에서 창을 꽉 채우는 카드(#panel/#win/#toast, 셸은 바)의
+# background와 같은 값이어야 한다. 창은 불투명하고 모서리만 DWM이 깎기 때문에
+# (_round_window_corners 참고) 카드가 안 덮은 자리와 둥근 모서리 가장자리에는 이 색이
+# 깔린다 - 카드 색과 다르면 테두리처럼 삐져나와 보인다.
 CARD_BG = {
     "shell.html": "#152340",
     "panel.html": "#152340",
@@ -89,53 +89,57 @@ CARD_BG = {
     "user_id_dialog.html": "#152340",
 }
 
-_RGN_OR = 2  # CombineRgn 모드
+# 툴바 펼침/접힘 애니메이션(App._animate_shell_width 참고). 창을 resize하는 방식이라
+# 한 단계마다 WebView2가 다시 배치를 계산한다 - 단계를 너무 잘게 쪼개면 오히려 버벅인다.
+_SHELL_ANIM_MS = 160
+_SHELL_ANIM_STEPS = 10
 
 
-def _set_window_shape(win, rects, dpr):
-    """창을 rects(실제로 그려지는 사각형들) 모양으로 도려내서, 그 바깥을 진짜 투명하게
-    만든다. 이 프로젝트의 모든 창이 이 방식으로 투명 처리된다 - 셸은 버튼들 모양으로,
-    나머지 창(패널/토스트/메뉴/다이얼로그)은 둥근 카드 하나 모양으로.
+_DWMWA_WINDOW_CORNER_PREFERENCE = 33
+_DWMWCP_ROUND = 2  # 윈도우 11 기본 창과 같은 반지름(이 화면 기준 약 8px)
 
-    아이콘 뒤/사이나 패널 둥근 모서리 바깥이 회색으로 보였던 이유: pywebview는
-    transparent=True면 WebView2의 DefaultBackgroundColor만 투명으로 바꿔주고
-    (edgechromium.py), 정작 그 WebView2를 담고 있는 WinForms Form의 BackColor는
-    기본값(SystemColors.Control = 밝은 회색) 그대로 둔다. 그래서 웹 쪽이 투명한
-    부분에서는 바탕화면이 아니라 Form의 회색이 비쳐 보인다(pywebview 6.2.1에는
-    AllowTransparency/TransparencyKey를 세팅하는 코드가 아예 없다).
 
-    Form에 TransparencyKey를 걸면 보이기는 제대로 뚫리는데, 그러면 창 전체가
-    레이어드 윈도우가 되면서 클릭이 통째로 뒤(바탕화면)로 새어나가 아이콘을 눌러도
-    아무 반응이 없다 - 실제로 WindowFromPoint가 아이콘 한가운데에서도 바탕화면
-    SysListView32를 돌려주는 걸 확인했다. 그래서 그 방법은 쓸 수 없다.
+def _round_window_corners(win):
+    """창 모서리를 DWM(윈도우 컴포지터)한테 둥글게 깎아달라고 맡긴다. 이 프로젝트의
+    모든 창(셸/패널/토스트/메뉴/다이얼로그)이 이걸로 모서리를 만든다.
 
-    대신 SetWindowRgn으로 창의 "모양" 자체를 잘라낸다. 리전 밖은 아예 창이 없는 것과
-    같아서 그리지도, 클릭을 먹지도 않는다(빈 곳을 누르면 그대로 뒤 창으로 넘어간다).
-    리전 안쪽은 평범한 불투명 창이라 클릭이 정상 동작한다. 다만 리전 경계는 GDI라
-    안티에일리어싱이 없어서, 둥근 모서리를 아주 확대해 보면 살짝 계단처럼 보인다.
+    창은 전부 불투명하다 - 웹 쪽을 투명하게 만들어서 둥근 모서리를 그리는 방법은
+    두 번 시도했다가 다 막혔다. pywebview는 transparent=True면 WebView2의
+    DefaultBackgroundColor만 투명으로 바꿔주고(edgechromium.py), 정작 그 WebView2를
+    담고 있는 WinForms Form의 BackColor는 기본값(SystemColors.Control = 밝은 회색)
+    그대로 둬서, 투명한 부분에 바탕화면이 아니라 회색이 비친다(pywebview 6.2.1에는
+    AllowTransparency/TransparencyKey를 세팅하는 코드가 아예 없다). 그렇다고 Form에
+    TransparencyKey를 걸면 보이기는 뚫리는데 창 전체가 레이어드 윈도우가 되면서
+    클릭이 통째로 뒤(바탕화면)로 새어나간다 - WindowFromPoint가 아이콘 한가운데에서도
+    바탕화면 SysListView32를 돌려주는 걸 확인했다.
 
-    rects는 JS가 getBoundingClientRect()로 잰 CSS 픽셀 좌표 [left, top, right,
-    bottom, 모서리반지름]이고, dpr(devicePixelRatio)을 곱해서 물리 픽셀로 바꾼다.
-    CSS 값을 파이썬에 하드코딩하지 않으려고 JS에서 재서 넘겨받는다."""
+    그래서 창 배경을 카드와 같은 색으로 칠해두고(CARD_BG), 모서리만 DWM한테
+    맡긴다. 예전에는 SetWindowRgn으로 창 모양 자체를 카드 모양대로 도려냈는데,
+    GDI 리전은 경계가 픽셀 단위 on/off라(안티에일리어싱이 없다) 둥근 모서리가
+    눈에 띄게 계단처럼 깨졌다. DWM 라운딩은 컴포지터가 알파로 섞어 그려서 매끈하다.
+
+    대신 DWM은 "창 사각형 하나"만 깎을 수 있다. 창을 버튼 여러 개 모양으로 뚫는
+    건 리전으로만 되는 일이라, 셸을 아이콘 사이 간격 없는 이어진 바 하나로 만든
+    게 이것 때문이다(shell.css 참고).
+
+    반지름은 우리가 못 정하고 DWM이 정한다(둥글게/살짝 둥글게 둘 중 하나). 또
+    윈도우 11(빌드 22000+)부터만 있는 속성이라, 그 이전 윈도우에서는 그냥
+    실패값을 돌려주고 아무 일도 안 일어난다 - 모서리가 각져 보일 뿐 나머지
+    동작에는 문제가 없다."""
     hwnd = _window_hwnd(win)
     if not hwnd:
         return
 
-    combined = ctypes.windll.gdi32.CreateRectRgn(0, 0, 0, 0)
-    for left, top, right, bottom, radius in rects:
-        x0, y0 = math.floor(left * dpr), math.floor(top * dpr)
-        x1, y1 = math.ceil(right * dpr), math.ceil(bottom * dpr)
-        d = max(0, round(radius * dpr)) * 2  # CreateRoundRectRgn은 반지름이 아니라 지름을 받는다
-        if d:
-            piece = ctypes.windll.gdi32.CreateRoundRectRgn(x0, y0, x1, y1, d, d)
-        else:
-            piece = ctypes.windll.gdi32.CreateRectRgn(x0, y0, x1, y1)
-        ctypes.windll.gdi32.CombineRgn(combined, combined, piece, _RGN_OR)
-        ctypes.windll.gdi32.DeleteObject(piece)
-
-    # SetWindowRgn이 성공하면 리전 소유권을 OS가 가져가므로 여기서 지우면 안 된다.
-    if not ctypes.windll.user32.SetWindowRgn(hwnd, combined, True):
-        ctypes.windll.gdi32.DeleteObject(combined)
+    pref = ctypes.c_int(_DWMWCP_ROUND)
+    try:
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            ctypes.c_void_p(hwnd),
+            ctypes.c_uint(_DWMWA_WINDOW_CORNER_PREFERENCE),
+            ctypes.byref(pref),
+            ctypes.sizeof(pref),
+        )
+    except (AttributeError, OSError):
+        pass
 
 
 def _window_hwnd(win):
@@ -146,7 +150,7 @@ def _window_hwnd(win):
     return int(form.Handle.ToInt64()) if form is not None else None
 
 
-def _create_window(title, _scale_size=True, **kwargs):
+def _create_window(title, _scale_size=True, _round_corners=False, **kwargs):
     """webview.create_window()의 얇은 래퍼. frameless+transparent 창을 만들면 pywebview가
     Windows에서 창 생성 시점에 크기를 요청한 것과 전혀 다른 비율로(가로는 부풀고
     세로는 찌그러들어, 예: 56x56 요청 -> 115x18) 잡는 버그가 있다 - 이게 바로
@@ -161,20 +165,19 @@ def _create_window(title, _scale_size=True, **kwargs):
     resize/move로 정확한 크기를 맞춘 다음에야 show()한다 - 안 그러면(원래 코드처럼
     보이는 채로 만들었다가 나중에 고치면) 사용자 눈에 창이 잘못된 크기로 반짝 나타났다가
     올바른 크기로 훽 줄어드는(또는 커지는) 게 그대로 보인다("할당된 일감"처럼 큰 패널일수록
-    더 눈에 띈다). 호출부에서 hidden을 따로 넘기면 그 값을 존중한다."""
+    더 눈에 띈다). 호출부에서 hidden을 따로 넘기면 그 값을 존중한다.
+
+    _round_corners=True면 보여주기 직전에 DWM 라운딩을 걸어둔다(_round_window_corners
+    참고) - 창 핸들이 있어야 하니 창이 다 만들어지는 loaded까지 기다렸다 건다."""
     kwargs.setdefault("hidden", True)
     win = webview.create_window(title, **kwargs)
     width, height = kwargs.get("width"), kwargs.get("height")
     x, y = kwargs.get("x"), kwargs.get("y")
 
-    # Api는 창마다 새로 만들어 넘기니, 어느 창에서 온 호출인지 알 수 있게 짝지어 둔다
-    # (Api.set_window_shape이 이걸 쓴다). 창 객체는 지금 막 생겼으니 여기서만 붙일 수 있다.
-    api = kwargs.get("js_api")
-    if api is not None:
-        api._window = win
-
     def _reveal():
         _apply_geometry(win, width, height, x, y, _scale_size)
+        if _round_corners:
+            _round_window_corners(win)
         win.show()
 
     win.events.loaded += _reveal
@@ -234,6 +237,11 @@ TEAM_PROGRESS_TITLE = "팀별 진행상황"
 SECTION_LABEL = {"company": "레드마인(150)", "team": "레드마인(20)"}
 SECTION_ORDER = {"company": 0, "team": 1}
 
+# 내 일감 알림(App._notify_new_my_issues)이 쓰는 값들. seen 키는 redmine_seen_issues.json에서
+# 즐겨찾기 프로젝트 키("company:123" 같은 "source:id" 꼴)와 한 파일을 나눠 쓰므로 겹치면 안 된다.
+MY_ISSUES_SEEN_KEY = "my_issues"
+MY_ISSUES_TOAST_HEADING = "나에게 할당됨"
+
 # kind -> (템플릿 파일, 창 너비, 창 높이)
 PANEL_SPEC = {
     "company_tree": ("panel.html", 300, 680),
@@ -253,17 +261,10 @@ class Api:
     파이썬 쪽 진입점."""
 
     def __init__(self, app):
+        # 이름 앞의 _는 필수 - pywebview는 js_api 객체의 "밑줄로 시작하지 않는" 속성을
+        # 전부 훑어서 JS에 노출하는데(util.py get_functions), 밑줄이 없으면 App 객체
+        # 내부 메서드까지 통째로 페이지에 노출된다.
         self._app = app
-        # _create_window()가 만들어진 창을 여기에 짝지어 준다. 이름 앞의 _는 필수 -
-        # pywebview는 js_api 객체의 "밑줄로 시작하지 않는" 속성을 전부 훑어서 JS에
-        # 노출하는데(util.py get_functions), 밑줄이 없으면 Window 객체 내부 메서드까지
-        # 통째로 페이지에 노출된다.
-        self._window = None
-
-    def set_window_shape(self, rects, dpr):
-        """window_shape.js가 잰 카드 모양을 받아서 창을 그 모양으로 잘라낸다."""
-        if self._window is not None:
-            _set_window_shape(self._window, rects, dpr)
 
     def open_panel(self, kind):
         self._app.open_panel(kind)
@@ -298,11 +299,23 @@ class Api:
     def set_toolbar_open(self, open_):
         self._app.set_toolbar_open(open_)
 
-    def set_shell_shape(self, state, rects, dpr):
-        self._app.set_shell_shape(state, rects, dpr)
+    def begin_icon_drag(self):
+        self._app.begin_icon_drag()
+
+    def drag_icon(self, dx, dy):
+        self._app.drag_icon(dx, dy)
+
+    def end_icon_drag(self):
+        self._app.end_icon_drag()
+
+    def toggle_autostart(self):
+        self._app.toggle_autostart()
 
     def search_issues(self, kind, query, all_projects=False):
         return self._app.search_issues(kind, query, all_projects)
+
+    def open_issue_by_id(self, issue_id):
+        return self._app.open_issue_by_id(issue_id)
 
     def load_more_issues(self, project_id, source, offset):
         return self._app.load_more_issues(project_id, source, offset)
@@ -336,17 +349,28 @@ class App:
         # 커진다(_apply_geometry 설명 참고) - 아래 icon_y처럼 "아이콘이 실제로
         # 차지하는 물리 픽셀 크기"가 필요한 계산은 icon_size가 아니라 이 값을 쓴다.
         self.icon_size_physical = round(self.icon_size * _DPI_SCALE)
-        self.icon_x = config.MARGIN
-        self.icon_y = screen.height - self.icon_size_physical - config.MARGIN - 40
-
-        self.shell_w = (
-            self.icon_size + config.QUICK_TOOLBAR_MARGIN
-            + config.QUICK_TOOLBAR_TOTAL_W + 20
+        self.screen_w, self.screen_h = screen.width, screen.height
+        # 기본 자리는 화면 왼쪽 아래(작업표시줄 위). 한 번이라도 끌어서 옮겼으면
+        # 그 자리를 기억해 뒀다가 거기서 뜬다(_end_icon_drag 참고).
+        default_pos = (
+            config.MARGIN,
+            screen.height - self.icon_size_physical - config.MARGIN - 40,
         )
-        # 셸 창은 transparent=True를 안 쓴다 - 그건 WebView2만 투명하게 만들 뿐
-        # 창(Form) 배경은 회색으로 남아서 오히려 아이콘 뒤가 회색 막대로 보인다
-        # (_set_window_shape 설명 참고). 대신 창 배경을 버튼과 같은 남색으로 칠하고,
-        # 실제 투명 처리는 SetWindowRgn(창 모양 잘라내기)으로 한다.
+        self.icon_x, self.icon_y = self._clamp_icon_pos(
+            *(widget_state.load_icon_position() or default_pos)
+        )
+        self._drag_origin = None  # 드래그 시작 시점의 아이콘 위치
+
+        # 셸 창은 창 사각형 = 눈에 보이는 바 그 자체라(리전으로 잘라내지 않는다 -
+        # _round_window_corners 참고), 이 너비가 shell.css의 바 너비와 정확히 같아야
+        # 한다. 남으면 아이콘 없는 빈 남색이 붙어 보이고, 모자라면 마지막 아이콘이 잘린다.
+        self.shell_w = (
+            self.icon_size + config.QUICK_TOOLBAR_MARGIN + config.QUICK_TOOLBAR_TOTAL_W
+        )
+        self.shell_width = self.icon_size  # 지금 실제 창 너비(접힘 상태로 시작)
+        self._shell_anim_id = 0
+        # 창 배경을 바와 같은 남색으로 칠하고 모서리만 DWM한테 둥글게 깎아달라고
+        # 맡긴다 - transparent=True는 왜 못 쓰는지 포함해서 _round_window_corners 참고.
         self.shell = _create_window(
             "shell", html=bundle_html("shell.html"),
             width=self.icon_size, height=self.icon_size,
@@ -357,11 +381,8 @@ class App:
             min_size=(1, 1),  # 기본 최소 크기(200x100)보다 작은 창이 강제로 커지는 것을 막는다
             js_api=Api(self),
             _scale_size=False,  # _apply_geometry 설명 참고 - CSS가 원본 px 그대로라 크기는 안 나눔
+            _round_corners=True,
         )
-        # JS가 재서 넘겨준 "닫힘/열림 상태의 버튼 사각형들"(_set_window_shape 참고)
-        self.shell_shapes = {}
-        self.shell_state = "closed"
-        self.shell_dpr = _DPI_SCALE
 
         self.panel = None
         self.panel_kind = None
@@ -385,44 +406,113 @@ class App:
         self._toast_counter = 0
 
     # ── 메인 아이콘 옆 퀵 툴바 펼침/접힘 ───────────
-    # 창을 툴바가 닫혔을 땐 아이콘 크기만큼만, 열렸을 땐 전체 너비로 실제로 resize
-    # 한다. 창 모양(리전)도 같이 그 상태의 버튼들 모양으로 바꿔줘야 아이콘 사이/뒤가
-    # 투명하게 유지된다(_set_window_shape 참고).
     def set_toolbar_open(self, open_):
-        self.shell_state = "open" if open_ else "closed"
-        width = self.shell_w if open_ else self.icon_size
+        """툴바를 펼치거나 접는다 - 실제로는 셸 창 너비를 늘렸다 줄이는 게 전부다.
+
+        예전엔 CSS(#toolbar의 max-width transition)가 펼침 애니메이션을 맡고 창은
+        한 번에 넓혔다. 창을 버튼 모양대로 잘라내던(SetWindowRgn) 시절엔 창의 빈
+        부분이 아예 안 보였으니 그래도 됐는데, 지금은 창 사각형 그대로가 눈에 보이는
+        바라(_round_window_corners 참고) 창을 먼저 넓히면 아이콘 없는 빈 남색 바가
+        번쩍 나타난 뒤에 아이콘이 따라 들어온다. 그래서 아이콘들은 늘 그려 두고,
+        바가 자라면서 그것들이 차례로 드러나게 창 너비 쪽을 애니메이션한다."""
+        self._animate_shell_width(self.shell_w if open_ else self.icon_size)
+
+    def _animate_shell_width(self, target):
+        # 펼치는 중에 다시 접으라고 하면(빠르게 두 번 클릭) 두 애니메이션이 서로
+        # 너비를 되돌리며 싸운다 - 번호를 매겨서 최신 것만 살아남게 한다.
+        self._shell_anim_id += 1
+        anim_id = self._shell_anim_id
+        start = self.shell_width
+        if start == target:
+            return
+
+        def run():
+            for step in range(1, _SHELL_ANIM_STEPS + 1):
+                time.sleep(_SHELL_ANIM_MS / 1000 / _SHELL_ANIM_STEPS)
+                if anim_id != self._shell_anim_id:
+                    return  # 더 최신 애니메이션이 시작됐다
+                # ease-out - 처음엔 빠르게, 끝에서 부드럽게 멈춘다
+                t = step / _SHELL_ANIM_STEPS
+                eased = 1 - (1 - t) ** 3
+                self._set_shell_width(target if step == _SHELL_ANIM_STEPS
+                                      else round(start + (target - start) * eased))
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _set_shell_width(self, width):
+        self.shell_width = width
         _apply_geometry(
             self.shell, width=width, height=self.icon_size,
             x=self.icon_x, y=self.icon_y, scale_size=False,
         )
-        self._apply_shell_shape()
 
-    def set_shell_shape(self, state, rects, dpr):
-        """shell.js가 두 상태(closed/open)의 버튼 사각형을 재서 넘겨준다."""
-        self.shell_shapes[state] = rects
-        self.shell_dpr = dpr or _DPI_SCALE
-        if state == self.shell_state:
-            self._apply_shell_shape()
+    # ── 아이콘을 끌어서 위젯 옮기기 ────────────────
+    def _clamp_icon_pos(self, x, y):
+        """아이콘이 화면 밖으로 나가지 않게 자른다. 저장해 둔 위치를 불러올 때도 꼭
+        거쳐야 한다 - 그 사이 해상도나 배율이 바뀌었거나 모니터를 뺐으면, 위젯이
+        보이지도 않는 자리에 떠서 다시 끌어올 방법이 없어진다."""
+        max_x = max(0, self.screen_w - self.icon_size_physical)
+        max_y = max(0, self.screen_h - self.icon_size_physical)
+        return min(max(0, int(x)), max_x), min(max(0, int(y)), max_y)
 
-    def _apply_shell_shape(self):
-        rects = self.shell_shapes.get(self.shell_state)
-        if rects:
-            _set_window_shape(self.shell, rects, self.shell_dpr)
+    def begin_icon_drag(self):
+        # 패널/우클릭 메뉴는 열릴 때 아이콘 위치를 기준으로 자리를 잡는다(open_panel
+        # 참고) - 끌고 가는 동안 제자리에 남아 있으면 어색하니 그냥 닫는다.
+        self.close_panel()
+        self.close_context_menu()
+        self._drag_origin = (self.icon_x, self.icon_y)
+
+    def drag_icon(self, dx, dy):
+        """드래그 시작점에서 (dx, dy)만큼 옮긴 자리로 위젯을 보낸다(물리 픽셀).
+        매번 현재 위치에 더하지 않고 시작점 기준으로 계산하는 이유: 이동 요청이
+        하나 유실되거나 화면 끝에서 잘려도 오차가 쌓이지 않는다."""
+        if self._drag_origin is None:
+            return
+        origin_x, origin_y = self._drag_origin
+        self.icon_x, self.icon_y = self._clamp_icon_pos(origin_x + dx, origin_y + dy)
+        _apply_geometry(self.shell, x=self.icon_x, y=self.icon_y)
+        self._reflow_toasts()  # 토스트는 아이콘 옆에 붙어 뜨니 같이 따라가야 한다
+
+    def end_icon_drag(self):
+        self._drag_origin = None
+        widget_state.save_icon_position(self.icon_x, self.icon_y)
+
+    # ── 윈도우 시작 시 자동 실행 ───────────────────
+    def toggle_autostart(self):
+        widget_state.set_autostart(not widget_state.autostart_enabled())
+        self._push_context_menu()  # 체크 표시를 실제로 적용된 상태로 다시 그린다
 
     # ── 우클릭 메뉴 ──────────────────────────────
     def open_context_menu(self):
         if self.context_menu is not None:
             self.context_menu.destroy()
-        w, h = 220, 108
+        # 내용이 고정 크기(항목 3개)라 창을 CSS 픽셀 기준으로 잡는다(_scale_size=False,
+        # _apply_geometry 설명 참고). 물리 픽셀로 주면 배율이 높은 화면일수록 CSS 뷰포트가
+        # 그만큼 줄어서 아래쪽 항목이 잘린다 - 실제로 110% 화면에서 108px로 준 창의
+        # 뷰포트가 99px까지 줄어 마지막 항목이 잘려 있었다.
+        # 실측 필요 높이는 항목 하나당 35.2 + #win 위아래 패딩 6이다(항목 4개 -> 152.8).
+        # 항목을 추가하면 여기 높이도 항목당 36px씩 같이 늘려야 한다.
+        w, h = 200, 156
         x = self.icon_x
-        y = max(self.icon_y - 8 - h, 0)
+        # y는 물리 픽셀이라 창이 실제로 차지하는 물리 높이(= CSS 높이 x 배율)를 빼야 한다.
+        y = max(self.icon_y - 8 - round(h * _DPI_SCALE), 0)
         self.context_menu = _create_window(
             "context_menu", html=bundle_html("context_menu.html"),
             width=w, height=h, x=x, y=y,
             frameless=True, on_top=True, resizable=False, shadow=False,
             background_color=CARD_BG["context_menu.html"],
             easy_drag=False, min_size=(1, 1), js_api=Api(self),
+            _round_corners=True, _scale_size=False,
         )
+        self.context_menu.events.loaded += self._push_context_menu
+
+    def _push_context_menu(self):
+        """자동 실행이 켜져 있는지를 메뉴에 알려준다(체크 표시). 레지스트리를 그때그때
+        읽으므로, 다른 데서 꺼졌더라도 메뉴를 열면 실제 상태가 보인다."""
+        if self.context_menu is None:
+            return
+        data = json.dumps({"autostart": widget_state.autostart_enabled()})
+        self.context_menu.evaluate_js(f"renderContextMenu({data})")
 
     def close_context_menu(self):
         if self.context_menu is not None:
@@ -450,15 +540,43 @@ class App:
         threading.Thread(target=worker_team, daemon=True).start()
 
     def refresh_my_issues(self):
-        def worker():
-            user_id = self.redmine_user_id or redmine_api.fetch_current_user_id()
-            issues = redmine_api.fetch_my_issues(user_id) if user_id else []
-            self.my_issues = issues
-            if self.panel_kind == "my_issues":
-                self._push_issues()
-            self.shell.evaluate_js(f"setMyIssuesCount({len(issues)})")
+        threading.Thread(target=self._reload_my_issues, daemon=True).start()
 
-        threading.Thread(target=worker, daemon=True).start()
+    def _reload_my_issues(self, notify=False):
+        """내게 할당된 일감을 다시 받아서 배지와 (열려 있다면) 목록을 갱신한다.
+        이미 백그라운드 스레드 위라고 보고 그 자리에서 조회한다 - 알림 루프가
+        이걸 직접 부르고, 나머지 호출부는 refresh_my_issues()로 스레드를 띄운다.
+
+        notify=True면 지난번에 없던 일감을 토스트로 알린다(알림 루프에서만 켠다)."""
+        user_id = self.redmine_user_id or redmine_api.fetch_current_user_id()
+        issues = redmine_api.fetch_my_issues(user_id) if user_id else []
+        if issues is None:
+            return  # 조회 실패 - 이번 회차는 건너뛰고 기존 목록/배지를 그대로 둔다
+
+        # 아이디를 아직 못 정했으면(user_id 없음) 목록이 빈 게 맞지만, 그걸 "일감이
+        # 사라졌다"고 기록해두면 나중에 아이디를 정한 순간 갖고 있던 일감이 전부
+        # 새 일감으로 보인다 - 믿을 수 있는 목록일 때만 알림 기준을 갱신한다.
+        if notify and user_id:
+            self._notify_new_my_issues(issues)
+
+        self.my_issues = issues
+        if self.panel_kind == "my_issues":
+            self._push_issues()
+        self.shell.evaluate_js(f"setMyIssuesCount({len(issues)})")
+
+    def _notify_new_my_issues(self, issues):
+        """지난 회차에 없던 일감(= 그 사이에 나에게 할당된 일감)을 토스트로 알린다."""
+        known = self.seen_issue_ids.get(MY_ISSUES_SEEN_KEY)
+        # 처음 보는 경우엔 알리지 않고 지금 목록만 "확인함"으로 기록한다 - 안 그러면
+        # 위젯을 처음 켜자마자 갖고 있던 일감 전부가 토스트로 쏟아진다
+        # (_check_new_issues의 즐겨찾기 쪽도 같은 방식이다).
+        if known is not None:
+            known_ids = set(known)
+            for issue in issues:
+                if issue["issue_id"] not in known_ids:
+                    self.show_toast(MY_ISSUES_TOAST_HEADING, issue["title"], issue["url"])
+        self.seen_issue_ids[MY_ISSUES_SEEN_KEY] = [issue["issue_id"] for issue in issues]
+        redmine_api.save_seen_issues(self.seen_issue_ids)
 
     def refresh_favorite_issues(self):
         favorites_snapshot = list(self.favorites)
@@ -477,13 +595,20 @@ class App:
 
         threading.Thread(target=worker, daemon=True).start()
 
-    # ── 새 이슈 알림 (즐겨찾기 프로젝트 대상, 1분 주기) ──
+    # ── 새 이슈 알림 (내 일감 + 즐겨찾기 프로젝트, 1분 주기) ──
     def start_notify_loop(self):
+        def poll():
+            # 내 일감을 먼저 본다 - 배지는 위젯을 접어놔도 늘 보이는 유일한 신호라
+            # 이게 밀리면 안 된다. 둘 다 같은 스레드에서 차례로 하는 이유는
+            # seen_issue_ids를 양쪽이 같이 쓰기 때문(따로 돌리면 서로 덮어쓴다).
+            self._reload_my_issues(notify=True)
+            self._check_new_issues()
+
         def loop():
-            self._check_new_issues()  # 시작하자마자 한 번 확인, 그 뒤로 주기적으로
+            poll()  # 시작하자마자 한 번 확인, 그 뒤로 주기적으로
             while True:
                 time.sleep(config.NOTIFY_POLL_INTERVAL_MS / 1000)
-                self._check_new_issues()
+                poll()
 
         threading.Thread(target=loop, daemon=True).start()
 
@@ -512,9 +637,11 @@ class App:
         self.seen_issue_ids.update(updated)
         redmine_api.save_seen_issues(self.seen_issue_ids)
         for project_name, issue in new_issues:
-            self.show_toast(project_name, issue)
+            self.show_toast(f"{project_name}  새 이슈", issue["subject"], issue["url"])
 
-    def show_toast(self, project_name, issue):
+    def show_toast(self, heading, subject, url):
+        """토스트 하나를 띄운다. heading은 첫 줄에 그대로 찍히는 문구다 - 어떤 종류의
+        알림인지(즐겨찾기 프로젝트의 새 이슈 / 나에게 할당된 일감) 여기서 정한다."""
         self._toast_counter += 1
         toast_id = self._toast_counter
         # 창을 만들자마자 move()로 옮기면 아직 초기화가 덜 끝나 자리를 못 잡는 경우가
@@ -529,14 +656,14 @@ class App:
             frameless=True, on_top=True, resizable=False, shadow=False,
             background_color=CARD_BG["toast.html"],
             easy_drag=False, min_size=(1, 1), js_api=Api(self),
+            _round_corners=True,
         )
         self.toasts.append((toast_id, toast))
         self._reflow_toasts()  # 그 사이 다른 토스트가 사라졌으면 자리를 다시 맞춘다
 
         def push():
             data = json.dumps({
-                "id": toast_id, "project": project_name,
-                "subject": issue["subject"], "url": issue["url"],
+                "id": toast_id, "heading": heading, "subject": subject, "url": url,
             }, ensure_ascii=False)
             toast.evaluate_js(f"renderToast({data})")
 
@@ -552,15 +679,31 @@ class App:
 
     def _reflow_toasts(self):
         # 메인 아이콘 오른쪽에, 아래에서 위로 쌓아 배치한다.
+        # win.move()를 직접 부르면 안 된다 - pywebview가 내부적으로 DPI 배율을 한 번 더
+        # 곱해서(_dpi_scale 설명 참고) 배율이 100%가 아닌 화면에서는 토스트가 엉뚱한
+        # 자리로 튄다. 창을 만들 때와 똑같이 _apply_geometry를 거쳐야 한다.
         x = self.icon_x + self.icon_size_physical + 12
         base_y = self.icon_y + self.icon_size_physical
         for idx, (_tid, win) in enumerate(self.toasts):
             y = base_y - (idx + 1) * (config.TOAST_H + config.TOAST_GAP)
-            win.move(x, y)
+            _apply_geometry(win, x=x, y=y)
 
     def open_toast_url(self, toast_id, url):
         webbrowser.open(url)
         self.dismiss_toast(toast_id)
+
+    def open_issue_by_id(self, issue_id):
+        """검색창에 이슈 번호만 친 경우 그 이슈를 바로 브라우저로 연다.
+
+        번호만으로는 전사/팀 어느 레드마인인지 알 수 없어서 전사부터 찾아보고 없으면
+        팀을 본다. 어느 쪽에도 없으면(또는 볼 권한이 없으면) None을 돌려주고, 그러면
+        검색창은 평소대로 제목 검색을 한다(issues_panel.js의 fireSearch 참고)."""
+        for source in ("company", "team"):
+            issue = redmine_api.fetch_issue(issue_id, source)
+            if issue:
+                webbrowser.open(issue["url"])
+                return issue
+        return None
 
     def search_issues(self, kind, query, all_projects=False):
         query = (query or "").strip()
@@ -664,15 +807,25 @@ class App:
     def open_user_id_dialog(self):
         if self.user_id_dialog is not None:
             self.user_id_dialog.destroy()
-        w, h = 340, 210
+        # 우클릭 메뉴와 같은 이유로 CSS 픽셀 기준(open_context_menu 설명 참고) - 이 창도
+        # 110% 화면에서 아래쪽 버튼 줄이 잘려 있었다(필요 211px, 확보된 뷰포트 190px).
+        #
+        # 폭은 #desc가 <br>로 나눈 3줄이 그대로 한 줄씩 들어가는 값이다 - 가장 긴 줄이
+        # 실측 337.9px, #win 좌우 패딩이 32px라 370px부터 안 접힌다(그보다 좁으면 4줄로
+        # 접혀서 문장이 어정쩡하게 끊긴다). 높이는 그 3줄 기준 내용 높이 157.8px에
+        # 버튼 줄(30px)과 그 위 여백(16px, #win 패딩과 같게)을 더한 값이다 - #btnRow가
+        # flex:1이라 남는 높이를 먹고 버튼을 아래에 붙이니, 이 여백이 곧 입력칸과
+        # 버튼 사이 간격이 된다. 문구를 고치면 이 두 값도 다시 재야 한다.
+        w, h = 380, 204
         x = self.icon_x
-        y = max(self.icon_y - 8 - h, 0)
+        y = max(self.icon_y - 8 - round(h * _DPI_SCALE), 0)
         self.user_id_dialog = _create_window(
             "user_id_dialog", html=bundle_html("user_id_dialog.html"),
             width=w, height=h, x=x, y=y,
             frameless=True, on_top=True, resizable=False, shadow=False,
             background_color=CARD_BG["user_id_dialog.html"],
             easy_drag=False, min_size=(1, 1), js_api=Api(self),
+            _round_corners=True, _scale_size=False,
         )
         self.user_id_dialog.events.loaded += self._push_user_id
 
@@ -732,6 +885,7 @@ class App:
             background_color=CARD_BG[template],
             easy_drag=False,  # 기본값 True면 목록 스크롤/클릭이 창 드래그로 먹힌다
             min_size=(1, 1), js_api=Api(self),
+            _round_corners=True,
         )
         if kind in TREE_TITLES:
             self.panel.events.loaded += self._push_tree
@@ -770,7 +924,7 @@ class App:
         self.panel.evaluate_js(f"renderResolvedPanel({data})")
 
     def get_resolved_by_version(self, project_id):
-        return redmine_api.fetch_resolved_issues_by_version(project_id)
+        return redmine_api.fetch_issues_by_version(project_id)
 
     def _push_team_progress_tree(self):
         if self.panel is None:
@@ -904,8 +1058,9 @@ def main():
 
     def startup():
         app.refresh_trees()
-        app.refresh_my_issues()
         app.refresh_favorite_issues()
+        # 내 일감은 따로 안 부른다 - 알림 루프가 시작하자마자 한 번 조회하면서
+        # 배지까지 채운다(App.start_notify_loop 참고).
         app.start_notify_loop()
 
     webview.start(startup, debug=False)

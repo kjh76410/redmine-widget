@@ -10,18 +10,32 @@ html, body {
     font-family: "Noto Sans KR", "맑은 고딕", sans-serif;
 }
 
+/* 셸은 아이콘 칸들이 빈틈없이 이어진 남색 바 하나다.
+   여기에 border-radius를 주면 안 된다 - 창을 버튼 모양대로 잘라내던(SetWindowRgn)
+   때와 달리 지금은 창 사각형 그대로가 눈에 보이고, 실제로 보이는 둥근 모서리는
+   DWM이 창 자체를 깎아서 만든다(main.py의 _round_window_corners 참고). CSS로
+   깎아봐야 그 바깥은 바탕화면이 아니라 창 배경(같은 남색)이라 티도 안 나고,
+   대신 hover로 밝아진 칸의 모서리만 어둡게 파여 보인다.
+
+   간격 없이 붙인 것도 같은 이유다 - DWM은 창 사각형 하나만 깎을 수 있어서, 칸
+   사이를 뚫으려면 리전(계단처럼 깨지는 그 방식)으로 돌아가야 한다. */
 #root {
     display: flex;
     align-items: center;
+    width: max-content;
     height: 56px;
-    padding: 0;
+    background: #152340;
 }
 
-.icon-btn {
+#toolbar {
+    display: flex;
+}
+
+.icon-btn, .tool-btn {
+    position: relative;
     width: 56px;
+    min-width: 56px;  /* 창이 좁아지는 접힘 애니메이션 중에 칸이 찌그러지지 않게 */
     height: 56px;
-    min-width: 56px;
-    border-radius: 3px;
     background: #152340;
     display: flex;
     align-items: center;
@@ -30,78 +44,31 @@ html, body {
     transition: filter 0.12s ease;
 }
 
-.icon-btn:hover {
-    filter: brightness(1.12);
-}
-
-.icon-glyph {
-    width: 34px;
-    height: 34px;
-    background: #ffffff;
-    -webkit-mask-image: url("assets/icons/main.png");
-    -webkit-mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-    -webkit-mask-size: contain;
-}
-
-#toolbar {
-    display: flex;
-    gap: 10px;
-    margin-left: 10px;
-    max-width: 0;
-    overflow: hidden;
-    opacity: 0;
-    transform: translateX(-6px);
-    transition: max-width 0.16s ease, opacity 0.16s ease, transform 0.16s ease;
-}
-
-#toolbar.open {
-    max-width: 400px;
-    opacity: 1;
-    transform: translateX(0);
-}
-
-/* shell.js의 pushShapes()가 열림/닫힘 모양을 재려고 툴바를 잠깐 여닫을 때만 쓴다 -
-   그 사이에 transition이 돌면 실제 펼침 애니메이션이 씹힌다. */
-#toolbar.no-anim {
-    transition: none;
-}
-
-.tool-btn {
-    position: relative;
-    width: 52px;
-    height: 52px;
-    min-width: 52px;
-    border-radius: 3px;  /* 메인 아이콘(.icon-btn)과 같은 값 - 나란히 놓이니 맞춰야 한다 */
-    background: #152340;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: filter 0.12s ease, transform 0.08s ease;
-}
-
-.tool-btn:hover {
-    filter: brightness(1.15);
+.icon-btn:hover, .tool-btn:hover {
+    filter: brightness(1.35);  /* 칸 사이에 간격이 없으니 예전보다 뚜렷해야 구분된다 */
 }
 
 .tool-btn:active {
-    transform: scale(0.96);
+    filter: brightness(0.9);
 }
 
-.tool-btn .glyph {
+.icon-glyph, .tool-btn .glyph {
     width: 34px;
     height: 34px;
     background: #ffffff;
     -webkit-mask-repeat: no-repeat;
     -webkit-mask-position: center;
     -webkit-mask-size: contain;
+}
+
+.icon-glyph {
+    -webkit-mask-image: url("assets/icons/main.png");
 }
 
 .tool-btn .badge {
     position: absolute;
-    top: -2px;
-    right: -2px;
+    top: 6px;
+    right: 6px;  /* 예전엔 칸 밖으로 삐져나와 있었는데, 지금은 창이 곧 바라서 잘린다 */
     min-width: 18px;
     height: 18px;
     padding: 0 4px;

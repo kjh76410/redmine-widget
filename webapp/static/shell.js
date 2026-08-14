@@ -1,83 +1,75 @@
 const mainIcon = document.getElementById("mainIcon");
-const toolbar = document.getElementById("toolbar");
 
 let panelOpen = false;
-const TOOLBAR_TRANSITION_MS = 160; // shell.css의 #toolbar transition 시간과 맞춤
 
-// ── 창 모양(리전) 알려주기 ────────────────────────────────
-// 파이썬이 SetWindowRgn으로 창을 "버튼들 모양"으로 잘라내야 아이콘 뒤/사이가 진짜
-// 투명해진다(main.py의 _set_window_shape 설명 참고). CSS 좌표를 파이썬에 두 벌로
-// 적어두면 금방 어긋나니, 실제로 그려진 위치를 여기서 재서 넘긴다.
-function measureRects(elements) {
-    return elements
-        .map((el) => {
-            const r = el.getBoundingClientRect();
-            const radius = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
-            return [r.left, r.top, r.right, r.bottom, radius];
-        })
-        .filter((r) => r[2] > r[0] && r[3] > r[1]);
-}
-
-function shapeOf(open) {
-    // 툴바가 닫혀 있어도 .tool-btn의 getBoundingClientRect()는 (부모의 overflow:hidden과
-    // 무관하게) 원래 크기를 그대로 돌려준다 - 그래서 "안 보이는 상태"를 크기로
-    // 걸러낼 수 없고, 닫힘 모양에는 아예 메인 아이콘만 넣는다.
-    const els = [mainIcon];
-    if (open) {
-        els.push(...document.querySelectorAll(".tool-btn"));
-        els.push(...document.querySelectorAll(".badge.show"));
-    }
-    return measureRects(els);
-}
-
-function pushShapes() {
-    if (!window.pywebview) return;
-
-    // 열림 모양은 툴바를 잠깐 펼쳐 봐야 잴 수 있다. .no-anim으로 transition을 꺼두고
-    // 재고 되돌려야, 이 측정 때문에 실제 펼침 애니메이션이 씹히지 않는다.
-    const wasOpen = toolbar.classList.contains("open");
-    toolbar.classList.add("no-anim");
-
-    toolbar.classList.remove("open");
-    void toolbar.offsetWidth;
-    const closed = shapeOf(false);
-
-    toolbar.classList.add("open");
-    void toolbar.offsetWidth;
-    const open = shapeOf(true);
-
-    toolbar.classList.toggle("open", wasOpen);
-    void toolbar.offsetWidth;
-    toolbar.classList.remove("no-anim");
-
-    const dpr = window.devicePixelRatio;
-    window.pywebview.api.set_shell_shape("closed", closed, dpr);
-    window.pywebview.api.set_shell_shape("open", open, dpr);
-}
-
-// pywebviewready가 이 스크립트보다 먼저 떠버렸을 수도 있어서 양쪽 다 대비한다
-// (모양을 한 번도 안 보내면 창이 안 잘려서 아이콘 모서리가 각지게 보인다).
-if (window.pywebview) {
-    pushShapes();
-} else {
-    window.addEventListener("pywebviewready", pushShapes);
-}
-
+// 툴바 아이콘들은 늘 그려져 있고, 파이썬이 셸 창 너비를 늘렸다 줄이면서 그것들을
+// 드러냈다 감춘다(main.py의 set_toolbar_open 설명 참고) - 그래서 여기선 알려주기만 하면 된다.
 function setPanelOpen(open) {
     panelOpen = open;
-    if (open) {
-        // 펼치기 전에 먼저 창 자체를 넓혀야, 펼쳐지는 아이콘들이 아직 좁은 창
-        // 폭에 잘리지 않는다.
-        window.pywebview.api.set_toolbar_open(true);
-        toolbar.classList.add("open");
-    } else {
-        toolbar.classList.remove("open");
-        // 접히는 애니메이션이 끝난 뒤에 창을 좁혀야 중간에 잘려 보이지 않는다.
-        setTimeout(() => window.pywebview.api.set_toolbar_open(false), TOOLBAR_TRANSITION_MS);
-    }
+    window.pywebview.api.set_toolbar_open(open);
 }
 
+// ── 메인 아이콘을 끌어서 위젯 옮기기 ──────────────
+// 창이 커서를 따라 같이 움직이니 창 기준 좌표(clientX)로는 이동량을 잴 수 없다.
+// 화면 기준 좌표(screenX)로 "누른 지점에서 얼마나 갔는지"만 본다.
+const DRAG_THRESHOLD = 4;  // 이만큼도 안 움직였으면 드래그가 아니라 그냥 클릭
+
+let dragStart = null;   // 누른 순간의 화면 좌표
+let dragged = false;    // 이번 누름이 드래그로 번졌는지
+let pendingDelta = null;
+
+// pointermove는 초당 수십~수백 번 오는데 그때마다 창을 옮기면 버벅인다. 화면 갱신
+// 주기에 한 번씩만 실제로 넘긴다.
+function queueDrag(dx, dy) {
+    const first = pendingDelta === null;
+    pendingDelta = [dx, dy];
+    if (first) requestAnimationFrame(flushDrag);
+}
+
+function flushDrag() {
+    if (pendingDelta === null) return;
+    const [dx, dy] = pendingDelta;
+    pendingDelta = null;
+    window.pywebview.api.drag_icon(dx, dy);
+}
+
+mainIcon.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;  // 우클릭은 메뉴 담당
+    dragStart = { x: e.screenX, y: e.screenY };
+    dragged = false;
+    mainIcon.setPointerCapture(e.pointerId);  // 커서가 창 밖으로 나가도 계속 받는다
+});
+
+mainIcon.addEventListener("pointermove", (e) => {
+    if (!dragStart) return;
+    const dx = e.screenX - dragStart.x;
+    const dy = e.screenY - dragStart.y;
+    if (!dragged) {
+        if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+        dragged = true;
+        window.pywebview.api.begin_icon_drag();
+    }
+    // 파이썬은 물리 픽셀로 창을 옮긴다 - screenX/Y는 CSS 픽셀이라 배율을 곱해서 넘긴다.
+    const dpr = window.devicePixelRatio;
+    queueDrag(Math.round(dx * dpr), Math.round(dy * dpr));
+});
+
+function endDrag() {
+    if (!dragStart) return;
+    dragStart = null;
+    if (dragged) {
+        flushDrag();  // 마지막 위치가 아직 안 넘어갔을 수 있다
+        window.pywebview.api.end_icon_drag();
+    }
+    // dragged는 여기서 되돌리지 않는다 - 바로 뒤에 click이 오는데, 그걸 보고
+    // "방금 옮긴 것"인지 판단해야 한다. 다음 pointerdown에서 초기화된다.
+}
+
+mainIcon.addEventListener("pointerup", endDrag);
+mainIcon.addEventListener("pointercancel", endDrag);
+
 mainIcon.addEventListener("click", () => {
+    if (dragged) return;  // 방금 끌어서 옮긴 것 - 툴바를 여닫지 않는다
     window.pywebview.api.close_panel();  // 열려있는 카드(트리/일감/버전별 연결된 일감)를 닫는다
     window.pywebview.api.close_context_menu();  // 열려있는 우클릭 메뉴도 같이 닫는다
     setPanelOpen(!panelOpen);
@@ -98,16 +90,10 @@ mainIcon.addEventListener("contextmenu", (e) => {
 // 파이썬(백그라운드 폴링) → 여기로 "할당된 일감" 개수 갱신을 알려줄 때 호출
 window.setMyIssuesCount = function (count) {
     const badge = document.getElementById("myIssuesBadge");
-    const before = badge.classList.contains("show") ? badge.textContent : "";
     if (count > 0) {
         badge.textContent = count > 99 ? "99+" : String(count);
         badge.classList.add("show");
     } else {
         badge.classList.remove("show");
     }
-    const after = badge.classList.contains("show") ? badge.textContent : "";
-    // 배지는 버튼 밖으로 삐져나오니 창 모양에도 반영해야 잘리지 않는다. 폴링이 같은
-    // 개수를 계속 알려줄 때마다 다시 잴 필요는 없다 - 실제로 바뀐 경우에만 다시 잰다
-    // (재는 동안 툴바를 잠깐 여닫기 때문에, 하필 펼침 애니메이션 중이면 그게 끊긴다).
-    if (after !== before) pushShapes();
 };

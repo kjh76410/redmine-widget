@@ -210,16 +210,22 @@ def resolve_user_id(identifier):
 def fetch_my_issues(identifier):
     """레드마인 REST API로 identifier(로그인 아이디 또는 숫자 ID)에게 할당된
     이슈 목록(id 내림차순)을 가져온다. 상태가 "완료"인 이슈는 목록에서 제외한다.
-    identifier가 없으면(아직 설정 전) 빈 리스트를 반환."""
+    identifier가 없으면(아직 설정 전) 빈 리스트를 반환.
+
+    조회에 실패하면 fetch_recent_issues와 같이 None을 반환한다 - 빈 목록과 꼭
+    구분해야 한다. 잠깐의 실패를 "할당된 일감 없음"으로 받아들이면 배지가 0으로
+    깜빡일 뿐 아니라, 알림 기준이 되는 "이미 본 일감" 목록까지 비워져서 다음
+    회차에 갖고 있던 일감 전부가 새로 할당된 것처럼 토스트로 쏟아진다
+    (main.py의 _notify_new_my_issues 참고)."""
     if not identifier:
         return []
     api_key = load_redmine_api_key()
     if not api_key:
-        return []
+        return None
 
     user_id = resolve_user_id(identifier)
     if not user_id:
-        return []
+        return None  # 아이디 조회 자체가 HTTP 호출이라, 일시적인 실패일 수 있다
 
     url = (
         f"{REDMINE_BASE_URL}/issues.json"
@@ -230,7 +236,7 @@ def fetch_my_issues(identifier):
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.load(resp)
     except (urllib.error.URLError, OSError, ValueError):
-        return []
+        return None
 
     issues = []
     for i in data.get("issues", []):
@@ -249,6 +255,33 @@ def fetch_my_issues(identifier):
             "project_id": i.get("project", {}).get("id"),
         })
     return issues
+
+
+def fetch_issue(issue_id, source="company"):
+    """이슈 번호 하나로 그 이슈만 가져온다(검색창에 번호를 쳤을 때 쓴다).
+    없는 번호거나 볼 권한이 없거나 조회에 실패하면 None."""
+    base_url, api_key = redmine_server(source)
+    if not api_key:
+        return None
+
+    url = f"{base_url}/issues/{int(issue_id)}.json"
+    req = urllib.request.Request(url, headers={"X-Redmine-API-Key": api_key})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.load(resp)
+    except (urllib.error.URLError, OSError, ValueError):
+        return None  # 404(없는 번호)도 여기로 온다 - HTTPError가 URLError의 하위 클래스
+
+    issue = data.get("issue")
+    if not issue:
+        return None
+    return {
+        "issue_id": issue.get("id"),
+        "title": issue.get("subject", ""),
+        "url": f"{base_url}/issues/{issue.get('id')}",
+        "tracker": issue.get("tracker", {}).get("name", ""),
+        "priority": issue.get("priority", {}).get("name", ""),
+    }
 
 
 def fetch_project_issue_list(project_id, source="company", offset=0, limit=200):
@@ -285,10 +318,11 @@ def fetch_project_issue_list(project_id, source="company", offset=0, limit=200):
     return issues, data.get("total_count", len(issues))
 
 
-def fetch_resolved_issues_by_version(project_id):
-    """레드마인 REST API로 특정 프로젝트의 종료성 상태(해결/종료/거부 등, status_id=closed)
-    이슈를 가져와 배포 버전별로 묶어 반환한다. 상태 기준은 나중에 조정될 수 있음
-    (우선 레이아웃 확인용). 실패/미설정 시 빈 리스트를 반환.
+def fetch_issues_by_version(project_id):
+    """레드마인 REST API로 특정 프로젝트에서 배포 버전(fixed_version)에 연결된 이슈를
+    가져와 버전별로 묶어 반환한다. 상태는 가리지 않고(status_id=*) 진행 중인 것까지 다
+    포함하며, 버전이 지정 안 된 이슈는 아예 제외한다("버전별 연결된 일감"이라는 화면
+    이름 그대로). 실패/미설정 시 빈 리스트를 반환.
     반환 형식: [{"version": str, "issues": [{"id":, "subject":, "url":}, ...]}, ...]"""
     api_key = load_redmine_api_key()
     if not api_key:
@@ -301,7 +335,7 @@ def fetch_resolved_issues_by_version(project_id):
     while offset < max_issues:
         url = (
             f"{REDMINE_BASE_URL}/issues.json"
-            f"?project_id={project_id}&status_id=closed&sort=updated_on:desc&limit={limit}&offset={offset}"
+            f"?project_id={project_id}&status_id=*&sort=updated_on:desc&limit={limit}&offset={offset}"
         )
         req = urllib.request.Request(url, headers={"X-Redmine-API-Key": api_key})
         try:
@@ -319,7 +353,10 @@ def fetch_resolved_issues_by_version(project_id):
     groups = {}
     order = []
     for i in issues:
-        version_name = i.get("fixed_version", {}).get("name") or "버전 미지정"
+        # fixed_version 키 자체가 없을 수도, 값이 null일 수도 있어서 양쪽 다 대비한다
+        version_name = (i.get("fixed_version") or {}).get("name")
+        if not version_name:
+            continue  # 버전에 연결 안 된 일감은 이 화면 대상이 아니다
         if version_name not in groups:
             groups[version_name] = []
             order.append(version_name)
