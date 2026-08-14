@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# 런타임 상태 파일 (사용자별로 값이 달라지므로 추적 제외)
+widget_position.json
