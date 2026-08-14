@@ -9,3 +9,4 @@ venv/
 
 # 런타임 상태 파일 (사용자별로 값이 달라지므로 추적 제외)
 widget_position.json
+redmine_seen_issues.json
