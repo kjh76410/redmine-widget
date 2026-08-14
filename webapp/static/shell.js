@@ -70,8 +70,11 @@ mainIcon.addEventListener("pointercancel", endDrag);
 
 mainIcon.addEventListener("click", () => {
     if (dragged) return;  // 방금 끌어서 옮긴 것 - 툴바를 여닫지 않는다
-    window.pywebview.api.close_panel();  // 열려있는 카드(트리/일감/버전별 연결된 일감)를 닫는다
-    window.pywebview.api.close_context_menu();  // 열려있는 우클릭 메뉴도 같이 닫는다
+    // 메인 아이콘을 누르면 열려 있던 건 다 닫는다 - 카드(트리/일감/버전별 연결된 일감),
+    // 우클릭 메뉴, 아이디 설정 창까지.
+    window.pywebview.api.close_panel();
+    window.pywebview.api.close_context_menu();
+    window.pywebview.api.close_user_id_dialog();
     setPanelOpen(!panelOpen);
 });
 
@@ -86,6 +89,13 @@ mainIcon.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     window.pywebview.api.open_context_menu();
 });
+
+// 파이썬(App._push_shell_labels)이 프로젝트 트리 버튼 두 개의 툴팁을 넣어줄 때 호출.
+// {company, team} - 트리 창 제목과 같은 문구라 파이썬 SECTION_LABEL 한 곳에서 온다.
+window.setToolbarLabels = function (labels) {
+    document.querySelector('[data-panel="company_tree"]').title = labels.company;
+    document.querySelector('[data-panel="team_tree"]').title = labels.team;
+};
 
 // 파이썬(백그라운드 폴링) → 여기로 "할당된 일감" 개수 갱신을 알려줄 때 호출
 window.setMyIssuesCount = function (count) {

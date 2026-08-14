@@ -17,10 +17,12 @@
         <div class="tool-btn" data-panel="favorites" title="즐겨찾기 프로젝트">
             <div class="glyph" style="-webkit-mask-image:url('assets/icons/bookmark.png')"></div>
         </div>
-        <div class="tool-btn" data-panel="company_tree" title="전체 프로젝트">
+        <!-- 이 둘의 툴팁은 파이썬이 넣어준다(shell.js의 setToolbarLabels) - 창 제목과
+             같은 문구라, 여기 또 적으면 서버 이름이 바뀔 때 따로 고쳐야 한다. -->
+        <div class="tool-btn" data-panel="company_tree">
             <div class="glyph" style="-webkit-mask-image:url('assets/icons/folder.png')"></div>
         </div>
-        <div class="tool-btn" data-panel="team_tree" title="팀 레드마인">
+        <div class="tool-btn" data-panel="team_tree">
             <div class="glyph" style="-webkit-mask-image:url('assets/icons/folder.png')"></div>
         </div>
         <div class="tool-btn" data-panel="resolved_by_version" title="버전별 연결된 일감">

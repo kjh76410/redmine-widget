@@ -39,16 +39,22 @@ function renderNode(node, depth) {
     const favKey = node.source + ":" + node.id;
     const star = document.createElement("span");
     star.className = "star";
-    star.textContent = favSet.has(favKey) ? "★" : "☆";
-    star.title = favSet.has(favKey) ? "즐겨찾기 해제" : "즐겨찾기 추가";
+
+    // 모양(★/☆)과 설명, 색(.on)이 항상 같이 바뀌어야 해서 한 군데서 칠한다.
+    function paintStar(isFav) {
+        star.textContent = isFav ? "★" : "☆";
+        star.title = isFav ? "즐겨찾기 해제" : "즐겨찾기 추가";
+        star.classList.toggle("on", isFav);
+    }
+    paintStar(favSet.has(favKey));
+
     star.addEventListener("click", (e) => {
         e.stopPropagation();
         window.pywebview.api
             .toggle_favorite(node.id, node.name, node.url, node.source)
             .then((isFav) => {
                 if (isFav) favSet.add(favKey); else favSet.delete(favKey);
-                star.textContent = isFav ? "★" : "☆";
-                star.title = isFav ? "즐겨찾기 해제" : "즐겨찾기 추가";
+                paintStar(isFav);
             });
     });
     row.appendChild(star);

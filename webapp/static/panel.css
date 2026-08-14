@@ -13,7 +13,7 @@ html, body {
 #panel {
     width: 100%;
     height: 100%;
-    background: #152340;
+    background: #F1F3F5;
     /* 여기에 border-radius를 주면 안 된다 - 눈에 보이는 둥근 모서리는 DWM이 창 자체를
        깎아서 만든다(main.py의 _round_window_corners 참고). CSS로 깎으면 그 바깥은
        바탕화면이 아니라 창 배경(같은 색)이라 티도 안 나는데, 반지름이 DWM 것과
@@ -25,7 +25,7 @@ html, body {
 }
 
 #title {
-    color: #E4E9F2;
+    color: #152340;
     font-size: 13px;
     font-weight: 700;
     padding: 14px 16px 8px;
@@ -46,33 +46,46 @@ html, body {
     padding-right: 10px;
     border-radius: 8px;
     cursor: pointer;
-    color: #E4E9F2;
+    color: #152340;
     font-size: 13px;
+    font-weight: 700;  /* 다른 창의 프로젝트 목록과 같은 굵기 - 색은 원래 같았는데
+                          굵기만 빠져 있어서 이 창만 글자가 연해 보였다 */
 }
 
 .row:hover {
-    background: #313F63;
+    background: #DBE2ED;
 }
 
 .row .arrow {
     width: 18px;
     text-align: center;
-    color: #98A2B8;
+    color: #5A6B85;
     font-size: 10px;
     flex: none;
 }
 
+/* 아직 즐겨찾기가 아닌 별(☆) - 목록 대부분이 이 상태라 눈에 안 띄는 색으로 둔다 */
 .row .star {
     width: 20px;
     text-align: center;
-    color: #6E92C8;
+    color: #A5ADBA;
     font-size: 13px;
     flex: none;
     cursor: pointer;
 }
 
+/* 즐겨찾기된 별(★)은 "즐겨찾기 프로젝트" 창의 별과 같은 금색(issues_panel.css의
+   .fav-star) - 두 창에서 같은 것을 가리킨다는 게 색으로 바로 보인다. */
+.row .star.on {
+    color: #F2A93B;
+}
+
 .row .star:hover {
-    color: #89A8D6;
+    color: #5A6B85;
+}
+
+.row .star.on:hover {
+    color: #D98C0A;
 }
 
 .row .label {
@@ -95,7 +108,7 @@ html, body {
 }
 
 #tree::-webkit-scrollbar-thumb {
-    background: #6E92C8;
+    background: #152340;
     border-radius: 4px;
 }
 
@@ -104,7 +117,7 @@ html, body {
 }
 
 .empty {
-    color: #98A2B8;
+    color: #5A6B85;
     font-size: 12px;
     padding: 8px 4px;
 }

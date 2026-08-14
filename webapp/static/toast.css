@@ -14,7 +14,7 @@ html, body {
     position: relative;
     width: 100%;
     height: 100%;
-    background: #EBF2FC;
+    background: #F1F3F5;
     /* border-radius 없음 - 모서리는 DWM이 창을 깎아서 만든다(panel.css 설명 참고) */
     display: flex;
     align-items: center;
@@ -33,7 +33,7 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #5E6C84;
+    color: #5A6B85;
     font-size: 13px;
     line-height: 1;
     cursor: pointer;
@@ -41,7 +41,7 @@ html, body {
 
 #closeBtn:hover {
     background: rgba(0, 0, 0, 0.08);
-    color: #172B4D;
+    color: #152340;
 }
 
 #texts {
@@ -55,7 +55,7 @@ html, body {
     display: flex;
     align-items: center;
     gap: 5px;
-    color: #0052CC;
+    color: #152340;
     font-size: 11px;
     font-weight: 700;
 }
@@ -64,7 +64,7 @@ html, body {
     width: 12px;
     height: 12px;
     min-width: 12px;
-    background: #0052CC;
+    background: #152340;
     -webkit-mask-image: url("assets/icons/info.png");
     -webkit-mask-repeat: no-repeat;
     -webkit-mask-position: center;
@@ -72,7 +72,7 @@ html, body {
 }
 
 #line2 {
-    color: #172B4D;
+    color: #152340;
     font-size: 12px;
     font-weight: 700;
     overflow: hidden;

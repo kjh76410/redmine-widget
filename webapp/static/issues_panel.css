@@ -1,3 +1,18 @@
+/* 팔레트 - 이 창들(일감/버전별/진행상황/토스트)이 다 같이 쓴다. 값을 바꾸면
+   resolved_panel.css / team_progress.css / toast.css와 main.py의 CARD_BG도 같이 맞춰야 한다.
+
+     #F1F3F5  카드 배경 - 창을 꽉 채우는 쿨 그레이 캔버스
+     #FFFFFF  한 단계 올린 표면 - 검색창, 필터 뱃지, 간트 눈금 칸
+     #CED4DA  경계선 / 구분선 - 캔버스와 같은 계열에서 두 단계 진한 값
+     #DBE2ED  hover 배경 - 캔버스에 네이비를 아주 옅게 섞은 값
+     #152340  기본 글자 + 강조색(선택된 카드, 활성 필터, 개수 뱃지, 간트 막대, 작은 아이콘).
+              shortcut과 같은 네이비다 - 위젯 바와 선택 상태가 같은 색이라 한 덩어리로 읽힌다.
+              캔버스 대비 13.2:1로, 선택된 항목이 확실히 떨어진다.
+     #FFFFFF  강조색 위에 얹는 글자/아이콘 (네이비 대비 15.6:1)
+     #5A6B85  보조 글자 - placeholder, 섹션 라벨 (캔버스 대비 4.5:1)
+     #1F7A63  완료(100%) 버전 막대 - 진행 중(네이비)과 구분되는 초록
+   유형/우선순위 뱃지 색은 issues_panel.js에 있다("연한 배경 + 진한 글자"). */
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -13,7 +28,7 @@ html, body {
 #win {
     width: 100%;
     height: 100%;
-    background: #EBF2FC;
+    background: #F1F3F5;
     /* border-radius 없음 - 모서리는 DWM이 창을 깎아서 만든다(panel.css 설명 참고) */
     display: flex;
     flex-direction: column;
@@ -33,7 +48,7 @@ html, body {
     height: 34px;
     border-radius: 17px;
     background: #FFFFFF;
-    border: 1px solid #DFE1E6;
+    border: 1px solid #CED4DA;
     display: flex;
     align-items: center;
     padding: 0 14px;
@@ -46,11 +61,11 @@ html, body {
     background: transparent;
     font-size: 12px;
     font-family: inherit;
-    color: #172B4D;
+    color: #152340;
 }
 
 #searchInput::placeholder {
-    color: #5E6C84;
+    color: #5A6B85;
 }
 
 #searchBtn {
@@ -58,7 +73,7 @@ html, body {
     height: 16px;
     min-width: 16px;
     margin-left: 8px;
-    background: #5E6C84;
+    background: #5A6B85;
     -webkit-mask-image: url("assets/icons/search.png");
     -webkit-mask-repeat: no-repeat;
     -webkit-mask-position: center;
@@ -67,7 +82,7 @@ html, body {
 }
 
 #searchBtn:hover {
-    background: #172B4D;
+    background: #152340;
 }
 
 /* 즐겨찾기 검색을 즐겨찾기 프로젝트로 좁힐지, 전체 프로젝트로 넓힐지 고르는 토글
@@ -79,7 +94,7 @@ html, body {
     gap: 4px;
     margin-left: 8px;
     font-size: 11px;
-    color: #5E6C84;
+    color: #5A6B85;
     white-space: nowrap;
     cursor: pointer;
     user-select: none;
@@ -87,6 +102,7 @@ html, body {
 
 #allProjectsToggle input {
     cursor: pointer;
+    accent-color: #152340;  /* 체크됐을 때 강조색과 같은 네이비로 */
 }
 
 #allProjectsToggle.hidden {
@@ -100,7 +116,7 @@ html, body {
     flex-wrap: wrap;
     gap: 4px;
     padding: 8px 10px;
-    border-bottom: 1px solid #DFE1E6;
+    border-bottom: 1px solid #CED4DA;
 }
 
 .filter-btn {
@@ -111,18 +127,18 @@ html, body {
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
-    background: #DFE1E6;
-    color: #5E6C84;
+    background: #FFFFFF;
+    color: #5A6B85;
 }
 
 .filter-btn:hover {
-    background: #C9CED6;
-    color: #172B4D;
+    background: #CED4DA;
+    color: #152340;
 }
 
 /* 고른 유형만 강조색으로 - 프로젝트 카드/트리의 선택 상태와 같은 파랑 */
 .filter-btn.active {
-    background: #0052CC;
+    background: #152340;
     color: #FFFFFF;
 }
 
@@ -142,7 +158,7 @@ html, body {
 
 #divider {
     width: 1px;
-    background: #DFE1E6;
+    background: #CED4DA;
 }
 
 /* 검색란/필터 뱃지 줄은 고정, 맨 아래 목록만 스크롤되게 세로 3단으로 나눈다
@@ -163,7 +179,7 @@ html, body {
 }
 
 .section {
-    color: #5E6C84;
+    color: #5A6B85;
     font-size: 11px;
     font-weight: 700;
     padding: 10px 6px 4px;
@@ -178,17 +194,17 @@ html, body {
     margin: 2px 0;
     border-radius: 8px;
     cursor: pointer;
-    color: #172B4D;
+    color: #152340;
     font-size: 12px;
     font-weight: 700;
 }
 
 .project-card:hover {
-    background: #DEEBFF;
+    background: #DBE2ED;
 }
 
 .project-card.selected {
-    background: #0052CC;
+    background: #152340;
     color: #FFFFFF;
 }
 
@@ -200,8 +216,7 @@ html, body {
     white-space: nowrap;
 }
 
-/* 즐겨찾기 창 왼쪽 목록의 별 - 누르면 해제(panel.js 트리의 별과 같은 문자, 색만 이 창의
-   밝은 배경에 맞춘다) */
+/* 즐겨찾기 창 왼쪽 목록의 별 - 누르면 해제(panel.js 트리의 별과 같은 문자) */
 .fav-star {
     flex: none;
     margin-right: 6px;
@@ -215,6 +230,8 @@ html, body {
     color: #D98C0A;
 }
 
+/* 선택된 카드는 네이비라, 그 위에서는 금색 별이 흰 별보다 잘 보이고 "즐겨찾기"라는
+   뜻도 그대로 남는다 */
 .project-card.selected .fav-star {
     color: #FFD966;
 }
@@ -234,7 +251,7 @@ html, body {
 }
 
 .bell.on {
-    background: #0052CC;
+    background: #152340;
     -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 22q-.825 0-1.412-.587Q10 20.825 10 20h4q0 .825-.587 1.413Q12.825 22 12 22Zm-8-3v-2h2v-7q0-2.075 1.25-3.687Q8.5 4.7 10.5 4.2v-.7q0-.625.438-1.063Q11.375 2 12 2t1.063.437Q13.5 2.875 13.5 3.5v.7q2 .5 3.25 2.113Q18 7.925 18 10v7h2v2Z'/%3E%3C/svg%3E");
 }
 
@@ -244,7 +261,7 @@ html, body {
 }
 
 .bell:hover {
-    background: #172B4D;
+    background: #152340;
 }
 
 .project-card.selected .bell {
@@ -262,7 +279,7 @@ html, body {
     height: 20px;
     padding: 0 6px;
     border-radius: 6px;
-    background: #0052CC;
+    background: #152340;
     color: #FFFFFF;
     font-size: 10px;
     font-weight: 700;
@@ -273,7 +290,7 @@ html, body {
 
 .project-card.selected .count {
     background: #FFFFFF;
-    color: #0052CC;
+    color: #152340;
 }
 
 .issue-row {
@@ -282,13 +299,13 @@ html, body {
     height: 34px;
     padding: 0 12px;
     cursor: pointer;
-    border-bottom: 1px solid #DFE1E6;
-    color: #172B4D;
+    border-bottom: 1px solid #CED4DA;
+    color: #152340;
     font-size: 12px;
 }
 
 .issue-row:hover {
-    background: #DEEBFF;
+    background: #DBE2ED;
 }
 
 .pill {
@@ -319,7 +336,7 @@ html, body {
 }
 
 .placeholder {
-    color: #5E6C84;
+    color: #5A6B85;
     font-size: 12px;
     padding: 16px;
 }
@@ -329,7 +346,7 @@ html, body {
 }
 
 #left::-webkit-scrollbar-thumb, #right::-webkit-scrollbar-thumb {
-    background: #0052CC;
+    background: #152340;
     border-radius: 4px;
 }
 

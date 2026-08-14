@@ -78,15 +78,18 @@ def _apply_geometry(win, width=None, height=None, x=None, y=None, scale_size=Tru
 # background와 같은 값이어야 한다. 창은 불투명하고 모서리만 DWM이 깎기 때문에
 # (_round_window_corners 참고) 카드가 안 덮은 자리와 둥근 모서리 가장자리에는 이 색이
 # 깔린다 - 카드 색과 다르면 테두리처럼 삐져나와 보인다.
+# 네이비(#152340)는 위젯 자체 - 바, 그 바에 붙어 뜨는 우클릭 메뉴와 설정창.
+# 쿨 그레이(#F1F3F5)는 레드마인 데이터를 보여주는 창들 - 프로젝트 트리, 일감,
+# 버전별, 진행상황, 토스트. 창이 무엇을 담는지에 따라 둘 중 하나를 쓴다.
 CARD_BG = {
     "shell.html": "#152340",
-    "panel.html": "#152340",
-    "issues_panel.html": "#EBF2FC",
-    "resolved_panel.html": "#EBF2FC",
-    "team_progress.html": "#EBF2FC",
-    "toast.html": "#EBF2FC",
     "context_menu.html": "#152340",
     "user_id_dialog.html": "#152340",
+    "panel.html": "#F1F3F5",
+    "issues_panel.html": "#F1F3F5",
+    "resolved_panel.html": "#F1F3F5",
+    "team_progress.html": "#F1F3F5",
+    "toast.html": "#F1F3F5",
 }
 
 # 툴바 펼침/접힘 애니메이션(App._animate_shell_width 참고). 창을 resize하는 방식이라
@@ -224,18 +227,20 @@ def bundle_html(template_name):
 
     return html
 
+# 어느 레드마인 서버에서 온 것인지를 가리키는 이름. 즐겨찾기/검색 목록의 구분자로도,
+# 프로젝트 트리 창의 제목으로도 같은 문구를 쓴다(TREE_TITLES 참고) - 서버가 바뀌어
+# 숫자를 고칠 때 두 군데를 따로 고치지 않도록 여기 한 곳에만 적는다.
+SECTION_LABEL = {"company": "레드마인(150)", "team": "레드마인(20)"}
+SECTION_ORDER = {"company": 0, "team": 1}
+
 TREE_TITLES = {
-    "company_tree": "전체 프로젝트",
-    "team_tree": "팀 레드마인",
+    "company_tree": SECTION_LABEL["company"],
+    "team_tree": SECTION_LABEL["team"],
 }
 ISSUES_TITLES = {
     "my_issues": "할당된 일감",
     "favorites": "즐겨찾기 프로젝트",
 }
-RESOLVED_TITLE = "버전별 연결된 일감"
-TEAM_PROGRESS_TITLE = "팀별 진행상황"
-SECTION_LABEL = {"company": "레드마인(150)", "team": "레드마인(20)"}
-SECTION_ORDER = {"company": 0, "team": 1}
 
 # 내 일감 알림(App._notify_new_my_issues)이 쓰는 값들. seen 키는 redmine_seen_issues.json에서
 # 즐겨찾기 프로젝트 키("company:123" 같은 "source:id" 꼴)와 한 파일을 나눠 쓰므로 겹치면 안 된다.
@@ -383,6 +388,7 @@ class App:
             _scale_size=False,  # _apply_geometry 설명 참고 - CSS가 원본 px 그대로라 크기는 안 나눔
             _round_corners=True,
         )
+        self.shell.events.loaded += self._push_shell_labels
 
         self.panel = None
         self.panel_kind = None
@@ -445,6 +451,12 @@ class App:
             self.shell, width=width, height=self.icon_size,
             x=self.icon_x, y=self.icon_y, scale_size=False,
         )
+
+    def _push_shell_labels(self):
+        """프로젝트 트리 버튼 두 개의 툴팁을 넣어준다. 트리 창 제목과 같은 문구라
+        (TREE_TITLES 참고) shell.html에 또 적지 않고 SECTION_LABEL에서 가져온다."""
+        data = json.dumps(SECTION_LABEL, ensure_ascii=False)
+        self.shell.evaluate_js(f"setToolbarLabels({data})")
 
     # ── 아이콘을 끌어서 위젯 옮기기 ────────────────
     def _clamp_icon_pos(self, x, y):
@@ -861,6 +873,15 @@ class App:
     def open_panel(self, kind):
         if kind not in PANEL_SPEC:
             return
+
+        # 다른 화면을 여는 순간, 열려 있던 우클릭 메뉴와 아이디 설정 창은 닫는다.
+        # 이 창들은 항상 위(on_top)에 떠 있어서, 안 닫으면 새로 연 패널을 가린 채
+        # 남는다. 아래 my_issues 분기보다 먼저 해야 한다 - close_user_id_dialog가
+        # _pending_my_issues_open을 지우기 때문에, 순서가 바뀌면 아이디를 저장한 뒤
+        # "할당된 일감"이 이어서 열리지 않는다.
+        self.close_context_menu()
+        self.close_user_id_dialog()
+
         if kind == "my_issues" and not self.redmine_user_id:
             self._pending_my_issues_open = True
             self.open_user_id_dialog()
@@ -920,7 +941,7 @@ class App:
         if self.panel is None:
             return
         # 원래 Tkinter 버전과 동일하게 전사 레드마인 프로젝트만 대상으로 한다.
-        data = json.dumps({"title": RESOLVED_TITLE, "tree": self.company_tree}, ensure_ascii=False)
+        data = json.dumps({"tree": self.company_tree}, ensure_ascii=False)
         self.panel.evaluate_js(f"renderResolvedPanel({data})")
 
     def get_resolved_by_version(self, project_id):
@@ -933,7 +954,7 @@ class App:
         # 조직 단위) 그대로 쓴다. 실제 "팀"은 최상위가 아니라 대체로 그 바로 아래
         # 자식 프로젝트다(예: Cybertel Bridge 밑의 "MCX솔루션 개발팀", "기구팀" 등) -
         # 그래서 최상위를 고르면 get_team_progress가 자식 단위로 쪼개서 보여준다.
-        data = json.dumps({"title": TEAM_PROGRESS_TITLE, "teams": self.company_tree}, ensure_ascii=False)
+        data = json.dumps({"teams": self.company_tree}, ensure_ascii=False)
         self.panel.evaluate_js(f"renderTeamProgressPanel({data})")
 
     def get_team_progress(self, project_id):

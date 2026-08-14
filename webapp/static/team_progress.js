@@ -1,4 +1,4 @@
-// 파이썬(App._push_team_progress_tree)이 호출하는 진입점: {title, teams} 형태의 데이터를
+// 파이썬(App._push_team_progress_tree)이 호출하는 진입점: {teams} 형태의 데이터를
 // 받는다. teams는 전사 레드마인 최상위(루트) 프로젝트 목록("Cybertel Bridge" 같은 회사/
 // 조직 단위) - 실제 "팀"은 대체로 이 바로 아래 자식 프로젝트라서(예: Cybertel Bridge 밑의
 // "MCX솔루션 개발팀", "기구팀" 등), 왼쪽 트리에서 최상위뿐 아니라 depth 1 자식(팀 자신)도
@@ -15,7 +15,6 @@ let selectedTeamRow = null;
 let loadToken = 0;
 
 function renderTeamProgressPanel(data) {
-    document.getElementById("title").textContent = data.title || "팀별 진행상황";
     const col = document.getElementById("colTeam");
     col.innerHTML = "";
     selectedTeamRow = null;
