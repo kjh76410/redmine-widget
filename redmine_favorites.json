@@ -3,7 +3,8 @@
     "id": 80,
     "name": "재난안전통신망",
     "url": "http://10.1.100.150/redmine/projects/pslte/issues",
-    "source": "company"
+    "source": "company",
+    "notify": false
   },
   {
     "id": 147,
@@ -33,13 +34,15 @@
     "id": 172,
     "name": "CASPER",
     "url": "http://10.1.100.150/redmine/projects/casper/issues",
-    "source": "company"
+    "source": "company",
+    "notify": true
   },
   {
     "id": 78,
     "name": "소방",
     "url": "http://10.1.100.20/projects/firefighting/issues",
-    "source": "team"
+    "source": "team",
+    "notify": false
   },
   {
     "id": 149,

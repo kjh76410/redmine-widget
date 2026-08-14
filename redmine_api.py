@@ -318,12 +318,34 @@ def fetch_project_issue_list(project_id, source="company", offset=0, limit=200):
     return issues, data.get("total_count", len(issues))
 
 
+def fetch_version_due_dates(project_id, api_key=None):
+    """{버전id: 종료일("YYYY-MM-DD" 또는 None)} 를 돌려준다.
+
+    이슈 조회(issues.json)가 딸려 보내주는 fixed_version에는 id와 이름밖에 없어서,
+    종료일은 프로젝트의 버전 목록을 따로 받아야 알 수 있다. 실패하면 빈 dict -
+    종료일만 못 붙을 뿐 일감 목록은 그대로 나오게 한다."""
+    api_key = api_key or load_redmine_api_key()
+    if not api_key:
+        return {}
+
+    url = f"{REDMINE_BASE_URL}/projects/{project_id}/versions.json"
+    req = urllib.request.Request(url, headers={"X-Redmine-API-Key": api_key})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.load(resp)
+    except (urllib.error.URLError, OSError, ValueError):
+        return {}
+
+    return {v.get("id"): v.get("due_date") for v in data.get("versions", [])}
+
+
 def fetch_issues_by_version(project_id):
     """레드마인 REST API로 특정 프로젝트에서 배포 버전(fixed_version)에 연결된 이슈를
     가져와 버전별로 묶어 반환한다. 상태는 가리지 않고(status_id=*) 진행 중인 것까지 다
     포함하며, 버전이 지정 안 된 이슈는 아예 제외한다("버전별 연결된 일감"이라는 화면
     이름 그대로). 실패/미설정 시 빈 리스트를 반환.
-    반환 형식: [{"version": str, "issues": [{"id":, "subject":, "url":}, ...]}, ...]"""
+    반환 형식: [{"version": str, "due_date": str|None,
+                 "issues": [{"id":, "subject":, "url":, "status":, "closed":}, ...]}, ...]"""
     api_key = load_redmine_api_key()
     if not api_key:
         return []
@@ -350,23 +372,39 @@ def fetch_issues_by_version(project_id):
         if not batch or offset >= data.get("total_count", 0):
             break
 
+    due_by_version_id = fetch_version_due_dates(project_id, api_key)
+
     groups = {}
+    version_ids = {}  # 버전명 -> 버전id (종료일을 붙이는 데 쓴다)
     order = []
     for i in issues:
         # fixed_version 키 자체가 없을 수도, 값이 null일 수도 있어서 양쪽 다 대비한다
-        version_name = (i.get("fixed_version") or {}).get("name")
+        version = i.get("fixed_version") or {}
+        version_name = version.get("name")
         if not version_name:
             continue  # 버전에 연결 안 된 일감은 이 화면 대상이 아니다
         if version_name not in groups:
             groups[version_name] = []
+            version_ids[version_name] = version.get("id")
             order.append(version_name)
         groups[version_name].append({
             "id": i.get("id"),
             "subject": i.get("subject", ""),
             "url": f"{REDMINE_BASE_URL}/issues/{i.get('id')}",
+            "status": i.get("status", {}).get("name", ""),
+            # 상태 "이름"만으로는 끝난 일감인지 알 수 없다(레드마인마다 완료 상태
+            # 이름이 다름) - closed_on이 찍혔는지로 판단해서 버전 진행률을 센다.
+            "closed": bool(i.get("closed_on")),
         })
 
-    return [{"version": version_name, "issues": groups[version_name]} for version_name in order]
+    return [
+        {
+            "version": version_name,
+            "due_date": due_by_version_id.get(version_ids[version_name]),
+            "issues": groups[version_name],
+        }
+        for version_name in order
+    ]
 
 
 def search_query_words(query):
