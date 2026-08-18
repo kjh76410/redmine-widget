@@ -2,7 +2,9 @@
 // tree는 전사 레드마인 프로젝트 트리(회사 것만 - 원래 Tkinter 버전과 동일한 범위).
 let selectedProjectRow = null;
 let selectedVersionRow = null;
+let selectedVersionGroup = null;
 let versionGroups = [];
+let yearFilter = null;  // null=전체, 그 외엔 연도(숫자) 또는 "none"(종료일 없는 버전)
 let loadToken = 0;
 
 // 상태 뱃지 색 - 일감 창의 유형/우선순위 뱃지와 같은 팔레트("연한 배경 + 진한 글자").
@@ -27,7 +29,11 @@ function renderResolvedPanel(data) {
     col.innerHTML = "";
     selectedProjectRow = null;
     selectedVersionRow = null;
+    selectedVersionGroup = null;
     versionGroups = [];
+    yearFilter = null;
+    document.getElementById("badgeVersion").innerHTML = "";
+    document.getElementById("badgeIssue").innerHTML = "";
     renderPlaceholder("colVersion", "왼쪽에서 프로젝트를 선택하세요.");
     renderPlaceholder("colIssue", "프로젝트와 버전을 선택하세요.");
 
@@ -93,7 +99,11 @@ function selectProject(node, row) {
     selectedProjectRow = row;
 
     selectedVersionRow = null;
+    selectedVersionGroup = null;
     versionGroups = [];
+    yearFilter = null;
+    document.getElementById("badgeVersion").innerHTML = "";
+    document.getElementById("badgeIssue").innerHTML = "";
     renderPlaceholder("colVersion", "불러오는 중...");
     renderPlaceholder("colIssue", "프로젝트와 버전을 선택하세요.");
 
@@ -108,54 +118,97 @@ function selectProject(node, row) {
     });
 }
 
+// 버전의 종료일 연도(없으면 "none") - 배지 묶음을 만들 때와 필터링할 때 같은 기준으로 쓴다.
+function versionYearKey(group) {
+    return group.due_date ? parseInt(group.due_date.slice(0, 4), 10) : "none";
+}
+
 function renderVersionCol() {
     const col = document.getElementById("colVersion");
     col.innerHTML = "";
+    renderVersionBadges();
     if (versionGroups.length === 0) {
         renderPlaceholder("colVersion", "해결된 이슈가 없습니다.");
         return;
     }
-    versionGroups.forEach((group) => {
-        const row = document.createElement("div");
-        row.className = "row";
 
-        // 종료일은 버전명 앞에 - 목록을 세로로 훑을 때 날짜가 한 줄로 정렬돼서
-        // "언제까지인지"가 먼저 읽힌다. 종료일이 없는 버전도 빈 자리를 남겨서
-        // (.due.none) 버전명 시작 위치는 모든 행이 같게 맞춘다.
-        const due = document.createElement("span");
-        due.className = group.due_date ? "due" : "due none";
-        if (group.due_date) {
-            due.textContent = formatDue(group.due_date);
-            due.title = `종료일 ${group.due_date}`;
-        }
-        row.appendChild(due);
+    // 최신 버전이 위로 오도록 종료일 내림차순으로 죽 늘어놓는다 - yearFilter가
+    // 걸려 있으면 그 연도(또는 종료일 없는 "미정")만 남기고 거른다. 연도 배지 자체는
+    // #badgeRow(고정 헤더)에 따로 그려서, 목록을 스크롤해도 항상 맨 위에 남는다.
+    const groups = versionGroups
+        .filter((g) => yearFilter === null || versionYearKey(g) === yearFilter)
+        .sort((a, b) => (a.due_date || "") > (b.due_date || "") ? -1 : (a.due_date || "") < (b.due_date || "") ? 1 : 0);
+    groups.forEach((group) => col.appendChild(renderVersionRow(group)));
+}
 
-        const label = document.createElement("span");
-        label.className = "label";
-        label.textContent = group.version;
-        row.appendChild(label);
+// 로드맵 칸의 연도 배지 - #badgeVersion(#badgeRow 안, 일감 칸 배지와 구분선 없이
+// 이어지는 자리)에 그린다. 최신 연도가 왼쪽에 오도록 내림차순, 종료일 없는 버전의
+// "미정" 배지는 맨 뒤에 둔다. 눌러서 그 연도만 거를 수 있고, 이미 걸려 있는 배지를
+// 다시 누르면 필터가 풀리고 전체가 다시 보인다.
+function renderVersionBadges() {
+    const bar = document.getElementById("badgeVersion");
+    bar.innerHTML = "";
+    if (versionGroups.length === 0) return;
 
-        // 개수 뱃지에 진행률을 같이 담는다("완료/전체") - 좁은 칸에 뱃지를 하나 더
-        // 붙이는 대신, 이미 있던 자리를 정보량만 늘려서 쓴다. 끝난 일감 판정은
-        // closed_on 기준이다(redmine_api.fetch_issues_by_version 참고).
-        const total = group.issues.length;
-        const done = group.issues.filter((i) => i.closed).length;
-        const count = document.createElement("span");
-        count.className = "count" + (total > 0 && done === total ? " done" : "");
-        count.textContent = `${done}/${total}`;
-        count.title = `전체 ${total}건 중 ${done}건 완료`
-            + (total ? ` (${Math.round((done / total) * 100)}%)` : "");
-        row.appendChild(count);
+    const years = [...new Set(versionGroups.map(versionYearKey))]
+        .sort((a, b) => (a === "none" ? 1 : b === "none" ? -1 : b - a));
 
-        row.addEventListener("click", () => {
-            if (selectedVersionRow) selectedVersionRow.classList.remove("selected");
-            row.classList.add("selected");
-            selectedVersionRow = row;
-            renderIssueCol(group.issues);
+    years.forEach((year) => {
+        const badge = document.createElement("span");
+        badge.className = "year-badge" + (yearFilter === year ? " active" : "");
+        badge.textContent = year === "none" ? "미정" : `${year}`;
+        badge.addEventListener("click", () => {
+            yearFilter = (yearFilter === year) ? null : year;
+            renderVersionCol();
         });
-
-        col.appendChild(row);
+        bar.appendChild(badge);
     });
+}
+
+function renderVersionRow(group) {
+    const row = document.createElement("div");
+    // 연도 배지로 필터를 바꾸면 목록 전체가 다시 그려지는데, 그때도 이미 골라 둔
+    // 버전의 선택 표시가 살아있게 group 참조(selectedVersionGroup)로 비교한다 -
+    // DOM 요소(selectedVersionRow)는 다시 그릴 때마다 새로 만들어져 못 미덥다.
+    row.className = "row" + (group === selectedVersionGroup ? " selected" : "");
+    if (group === selectedVersionGroup) selectedVersionRow = row;
+
+    // 종료일은 버전명 앞에 - 목록을 세로로 훑을 때 날짜가 한 줄로 정렬돼서
+    // "언제까지인지"가 먼저 읽힌다. 종료일이 없는 버전도 빈 자리를 남겨서
+    // (.due.none) 버전명 시작 위치는 모든 행이 같게 맞춘다.
+    const due = document.createElement("span");
+    due.className = group.due_date ? "due" : "due none";
+    if (group.due_date) {
+        due.textContent = formatDue(group.due_date);
+        due.title = `종료일 ${group.due_date}`;
+    }
+    row.appendChild(due);
+
+    const label = document.createElement("span");
+    label.className = "label";
+    label.textContent = group.version;
+    row.appendChild(label);
+
+    // 뱃지엔 진행률 퍼센트만 - 몇 건 중 몇 건인지는 툴팁으로 미룬다. 끝난 일감
+    // 판정은 closed_on 기준이다(redmine_api.fetch_issues_by_version 참고).
+    const total = group.issues.length;
+    const done = group.issues.filter((i) => i.closed).length;
+    const percent = total ? Math.round((done / total) * 100) : 0;
+    const count = document.createElement("span");
+    count.className = "count" + (total > 0 && done === total ? " done" : "");
+    count.textContent = `${percent}%`;
+    count.title = `전체 ${total}건 중 ${done}건 완료 (${percent}%)`;
+    row.appendChild(count);
+
+    row.addEventListener("click", () => {
+        if (selectedVersionRow) selectedVersionRow.classList.remove("selected");
+        row.classList.add("selected");
+        selectedVersionRow = row;
+        selectedVersionGroup = group;
+        renderIssueCol(group);
+    });
+
+    return row;
 }
 
 // "2026-05-31" -> "26.05.31". 가운데 칸이 좁아서(창 너비의 30%) 연도 네 자리를 다
@@ -165,11 +218,17 @@ function formatDue(dueDate) {
     return m ? `${m[1].slice(2)}.${m[2]}.${m[3]}` : dueDate;
 }
 
-function renderIssueCol(issues) {
+function renderIssueCol(group) {
     const col = document.getElementById("colIssue");
     col.innerHTML = "";
+    renderIssueBadge(group);
+
+    const issues = group.issues;
     if (!issues || issues.length === 0) {
-        renderPlaceholder("colIssue", "이슈가 없습니다.");
+        const p = document.createElement("div");
+        p.className = "placeholder";
+        p.textContent = "이슈가 없습니다.";
+        col.appendChild(p);
         return;
     }
     issues.forEach((issue) => {
@@ -196,4 +255,19 @@ function renderIssueCol(issues) {
         row.addEventListener("click", () => window.pywebview.api.open_url(issue.url));
         col.appendChild(row);
     });
+}
+
+// 일감 칸 배지 - #badgeIssue(#badgeRow 안, 로드맵 칸 배지 바로 옆에 구분선 없이
+// 이어지는 자리)에 그린다. 지금 보고 있는 게 어느 연도 버전인지(로드맵 칸에서
+// 넘어오며 종료일 문맥이 끊기니) 알려준다. 로드맵 칸의 배지와 달리 눌러도 아무
+// 일 없다(.year-badge.static - resolved_panel.css 참고) - 버전 하나를 골라 이미
+// 들어온 화면이라 여기서 더 거를 대상이 없다.
+function renderIssueBadge(group) {
+    const bar = document.getElementById("badgeIssue");
+    bar.innerHTML = "";
+    const year = versionYearKey(group);
+    const badge = document.createElement("span");
+    badge.className = "year-badge static";
+    badge.textContent = year === "none" ? "미정" : `${year}`;
+    bar.appendChild(badge);
 }

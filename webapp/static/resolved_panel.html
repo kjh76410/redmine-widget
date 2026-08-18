@@ -6,12 +6,21 @@
 </head>
 <body>
 <div id="win">
-    <div id="cols">
-        <div id="colProject" class="col"></div>
-        <div class="divider"></div>
-        <div id="colVersion" class="col"></div>
-        <div class="divider"></div>
-        <div id="colIssue" class="col"></div>
+    <!-- 프로젝트 칸은 원래 그대로(위쪽부터 목록만) 두고, 로드맵/일감 칸만 오른쪽에서
+         세로로 한 번 더 나눠(#rightCols) 그 둘 사이에 연도 배지 헤더를 얹는다 -
+         프로젝트 칸까지 이 헤더 행에 끼면 배지가 없는데도 그 칸 위에 빈 자리가
+         생겨 목록이 아래로 밀려 보인다(resolved_panel.js/css 참고). -->
+    <div id="colProject" class="col"></div>
+    <div class="divider"></div>
+    <div id="rightCols">
+        <div id="badgeRow">
+            <div id="badgeVersion" class="year-badges"></div><div id="badgeIssue" class="year-badges"></div>
+        </div>
+        <div id="cols">
+            <div id="colVersion" class="col"></div>
+            <div class="divider"></div>
+            <div id="colIssue" class="col"></div>
+        </div>
     </div>
 </div>
 <script src="resolved_panel.js"></script>

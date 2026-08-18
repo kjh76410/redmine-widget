@@ -4,7 +4,7 @@
     "name": "재난안전통신망",
     "url": "http://10.1.100.150/redmine/projects/pslte/issues",
     "source": "company",
-    "notify": false
+    "notify": true
   },
   {
     "id": 147,
@@ -13,47 +13,21 @@
     "source": "company"
   },
   {
-    "id": 277,
-    "name": "LM75EDC",
-    "url": "http://10.1.100.150/redmine/projects/lm75edc/issues",
+    "id": 3,
+    "name": "해외 프로젝트",
+    "url": "http://10.1.100.150/redmine/projects/out_projects/issues",
     "source": "company"
   },
   {
-    "id": 307,
-    "name": "DANTE",
-    "url": "http://10.1.100.150/redmine/projects/dante/issues",
+    "id": 146,
+    "name": "Nokia 프로젝트",
+    "url": "http://10.1.100.150/redmine/projects/mcx-out/issues",
     "source": "company"
   },
   {
-    "id": 173,
-    "name": "LM75D_PS",
-    "url": "http://10.1.100.150/redmine/projects/lm75d_ps/issues",
-    "source": "company"
-  },
-  {
-    "id": 172,
-    "name": "CASPER",
-    "url": "http://10.1.100.150/redmine/projects/casper/issues",
-    "source": "company",
-    "notify": true
-  },
-  {
-    "id": 78,
-    "name": "소방",
-    "url": "http://10.1.100.20/projects/firefighting/issues",
-    "source": "team",
-    "notify": false
-  },
-  {
-    "id": 149,
-    "name": "LTE-R",
-    "url": "http://10.1.100.150/redmine/projects/mcx-in-lter/issues",
-    "source": "company"
-  },
-  {
-    "id": 148,
-    "name": "IP-PTT",
-    "url": "http://10.1.100.150/redmine/projects/mcx-in-ipptt/issues",
-    "source": "company"
+    "id": 129,
+    "name": "재난망",
+    "url": "http://10.1.100.20/projects/vm65ps/issues",
+    "source": "team"
   }
 ]

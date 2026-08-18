@@ -318,12 +318,14 @@ def fetch_project_issue_list(project_id, source="company", offset=0, limit=200):
     return issues, data.get("total_count", len(issues))
 
 
-def fetch_version_due_dates(project_id, api_key=None):
-    """{버전id: 종료일("YYYY-MM-DD" 또는 None)} 를 돌려준다.
+def fetch_versions_meta(project_id, api_key=None):
+    """{버전id: {"due_date":, "created_on":}} 를 돌려준다.
 
     이슈 조회(issues.json)가 딸려 보내주는 fixed_version에는 id와 이름밖에 없어서,
-    종료일은 프로젝트의 버전 목록을 따로 받아야 알 수 있다. 실패하면 빈 dict -
-    종료일만 못 붙을 뿐 일감 목록은 그대로 나오게 한다."""
+    종료일/생성일은 프로젝트의 버전 목록을 따로 받아야 알 수 있다. created_on은
+    타임스탬프("2026-01-05T02:00:00Z")로 오길래 날짜만 잘라 쓴다(team_progress
+    간트차트가 날짜 단위로만 쓴다). 실패하면 빈 dict - 날짜만 못 붙을 뿐 나머지는
+    그대로 나오게 한다."""
     api_key = api_key or load_redmine_api_key()
     if not api_key:
         return {}
@@ -336,7 +338,19 @@ def fetch_version_due_dates(project_id, api_key=None):
     except (urllib.error.URLError, OSError, ValueError):
         return {}
 
-    return {v.get("id"): v.get("due_date") for v in data.get("versions", [])}
+    return {
+        v.get("id"): {
+            "due_date": v.get("due_date"),
+            "created_on": (v.get("created_on") or "")[:10] or None,
+        }
+        for v in data.get("versions", [])
+    }
+
+
+def fetch_version_due_dates(project_id, api_key=None):
+    """{버전id: 종료일("YYYY-MM-DD" 또는 None)} 를 돌려준다 - fetch_versions_meta에서
+    due_date만 뽑아 쓰는 얇은 래퍼(fetch_issues_by_version은 이것만 필요해서)."""
+    return {vid: meta["due_date"] for vid, meta in fetch_versions_meta(project_id, api_key).items()}
 
 
 def fetch_issues_by_version(project_id):
@@ -405,6 +419,82 @@ def fetch_issues_by_version(project_id):
         }
         for version_name in order
     ]
+
+
+def fetch_org_progress(pairs):
+    """팀별 진행상황 화면(team_progress.js)에서 쓴다. (project_id, 팀/프로젝트명)
+    목록을 받아 프로젝트마다 배포 버전(fixed_version)에 연결된 이슈를 모아 버전별
+    진행률을 계산해 돌려준다 - fetch_issues_by_version과 같은 소스(이슈 목록)를
+    보되, 일감 하나하나가 아니라 버전 단위 집계(완료 건수/퍼센트)로 쓴다는 점이 다르다.
+    반환 형식: [{"team": str, "team_id": int, "versions": [
+        {"version":, "created_on":, "due_date":, "total":, "closed":, "percent":, "url":},
+        ...]}, ...] (main.py App.get_team_progress가 팀 depth 2 소그룹으로 다시 쪼갠다).
+    실패/미설정 시 프로젝트마다 versions: [] 로 채워서 화면이 죽지 않게 한다."""
+    api_key = load_redmine_api_key()
+    return [
+        {"team": name, "team_id": pid, "versions": _fetch_version_progress(pid, api_key)}
+        for pid, name in pairs
+    ]
+
+
+def _fetch_version_progress(project_id, api_key):
+    if not api_key:
+        return []
+
+    issues = []
+    offset = 0
+    limit = 100
+    max_issues = 300
+    while offset < max_issues:
+        url = (
+            f"{REDMINE_BASE_URL}/issues.json"
+            f"?project_id={project_id}&status_id=*&limit={limit}&offset={offset}"
+        )
+        req = urllib.request.Request(url, headers={"X-Redmine-API-Key": api_key})
+        try:
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.load(resp)
+        except (urllib.error.URLError, OSError, ValueError):
+            break
+
+        batch = data.get("issues", [])
+        issues.extend(batch)
+        offset += limit
+        if not batch or offset >= data.get("total_count", 0):
+            break
+
+    versions_meta = fetch_versions_meta(project_id, api_key)
+
+    groups = {}  # 버전id -> {"name":, "total":, "closed":}
+    order = []
+    for i in issues:
+        version = i.get("fixed_version") or {}
+        vid = version.get("id")
+        if not vid or not version.get("name"):
+            continue  # 버전에 연결 안 된 일감은 이 화면 대상이 아니다
+        if vid not in groups:
+            groups[vid] = {"name": version.get("name"), "total": 0, "closed": 0}
+            order.append(vid)
+        groups[vid]["total"] += 1
+        if i.get("closed_on"):
+            groups[vid]["closed"] += 1
+
+    result = []
+    for vid in order:
+        g = groups[vid]
+        meta = versions_meta.get(vid, {})
+        total = g["total"]
+        closed = g["closed"]
+        result.append({
+            "version": g["name"],
+            "created_on": meta.get("created_on"),
+            "due_date": meta.get("due_date"),
+            "total": total,
+            "closed": closed,
+            "percent": round(closed / total * 100) if total else 0,
+            "url": f"{REDMINE_BASE_URL}/versions/{vid}",
+        })
+    return result
 
 
 def search_query_words(query):

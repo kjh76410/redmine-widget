@@ -316,6 +316,9 @@ class Api:
     def toggle_autostart(self):
         self._app.toggle_autostart()
 
+    def toggle_always_on_top(self):
+        self._app.toggle_always_on_top()
+
     def search_issues(self, kind, query, all_projects=False):
         return self._app.search_issues(kind, query, all_projects)
 
@@ -366,6 +369,9 @@ class App:
         )
         self._drag_origin = None  # 드래그 시작 시점의 아이콘 위치
 
+        # 항상 위 표시 - 꺼두면 위젯도 다른 창들처럼 뒤로 갈 수 있다(우클릭 메뉴에서 토글).
+        self.always_on_top = widget_state.always_on_top_enabled()
+
         # 셸 창은 창 사각형 = 눈에 보이는 바 그 자체라(리전으로 잘라내지 않는다 -
         # _round_window_corners 참고), 이 너비가 shell.css의 바 너비와 정확히 같아야
         # 한다. 남으면 아이콘 없는 빈 남색이 붙어 보이고, 모자라면 마지막 아이콘이 잘린다.
@@ -380,7 +386,7 @@ class App:
             "shell", html=bundle_html("shell.html"),
             width=self.icon_size, height=self.icon_size,
             x=self.icon_x, y=self.icon_y,
-            frameless=True, on_top=True, resizable=False, shadow=False,
+            frameless=True, on_top=self.always_on_top, resizable=False, shadow=False,
             background_color=CARD_BG["shell.html"],
             easy_drag=False,  # 기본값 True면 창 아무 데나 눌러서 드래그가 돼 스크롤/클릭과 충돌한다
             min_size=(1, 1),  # 기본 최소 크기(200x100)보다 작은 창이 강제로 커지는 것을 막는다
@@ -494,24 +500,38 @@ class App:
         widget_state.set_autostart(not widget_state.autostart_enabled())
         self._push_context_menu()  # 체크 표시를 실제로 적용된 상태로 다시 그린다
 
+    # ── 항상 위에 표시 ─────────────────────────────
+    def toggle_always_on_top(self):
+        self.always_on_top = not self.always_on_top
+        widget_state.set_always_on_top(self.always_on_top)
+        # 지금 떠 있는 모든 창에 바로 적용한다 - pywebview의 on_top setter가 그 창의
+        # TopMost를 즉시 바꿔주니(webview.window.Window.on_top 참고), 새로 여는 창까지
+        # 기다릴 필요 없이 아이콘/패널/메뉴 전부 한 번에 뒤로(또는 다시 위로) 간다.
+        live_windows = [self.shell, self.context_menu, self.user_id_dialog, self.panel]
+        live_windows += [win for _tid, win in self.toasts]
+        for win in live_windows:
+            if win is not None:
+                win.on_top = self.always_on_top
+        self._push_context_menu()  # 체크 표시를 실제로 적용된 상태로 다시 그린다
+
     # ── 우클릭 메뉴 ──────────────────────────────
     def open_context_menu(self):
         if self.context_menu is not None:
             self.context_menu.destroy()
-        # 내용이 고정 크기(항목 3개)라 창을 CSS 픽셀 기준으로 잡는다(_scale_size=False,
+        # 내용이 고정 크기(항목 5개)라 창을 CSS 픽셀 기준으로 잡는다(_scale_size=False,
         # _apply_geometry 설명 참고). 물리 픽셀로 주면 배율이 높은 화면일수록 CSS 뷰포트가
         # 그만큼 줄어서 아래쪽 항목이 잘린다 - 실제로 110% 화면에서 108px로 준 창의
         # 뷰포트가 99px까지 줄어 마지막 항목이 잘려 있었다.
-        # 실측 필요 높이는 항목 하나당 35.2 + #win 위아래 패딩 6이다(항목 4개 -> 152.8).
+        # 실측 필요 높이는 항목 하나당 35.2 + #win 위아래 패딩 6이다(항목 5개 -> 188.8).
         # 항목을 추가하면 여기 높이도 항목당 36px씩 같이 늘려야 한다.
-        w, h = 200, 156
+        w, h = 200, 192
         x = self.icon_x
         # y는 물리 픽셀이라 창이 실제로 차지하는 물리 높이(= CSS 높이 x 배율)를 빼야 한다.
         y = max(self.icon_y - 8 - round(h * _DPI_SCALE), 0)
         self.context_menu = _create_window(
             "context_menu", html=bundle_html("context_menu.html"),
             width=w, height=h, x=x, y=y,
-            frameless=True, on_top=True, resizable=False, shadow=False,
+            frameless=True, on_top=self.always_on_top, resizable=False, shadow=False,
             background_color=CARD_BG["context_menu.html"],
             easy_drag=False, min_size=(1, 1), js_api=Api(self),
             _round_corners=True, _scale_size=False,
@@ -519,11 +539,15 @@ class App:
         self.context_menu.events.loaded += self._push_context_menu
 
     def _push_context_menu(self):
-        """자동 실행이 켜져 있는지를 메뉴에 알려준다(체크 표시). 레지스트리를 그때그때
-        읽으므로, 다른 데서 꺼졌더라도 메뉴를 열면 실제 상태가 보인다."""
+        """자동 실행/항상 위 표시가 켜져 있는지를 메뉴에 알려준다(체크 표시). 자동
+        실행은 레지스트리를 그때그때 읽으므로, 다른 데서 꺼졌더라도 메뉴를 열면 실제
+        상태가 보인다."""
         if self.context_menu is None:
             return
-        data = json.dumps({"autostart": widget_state.autostart_enabled()})
+        data = json.dumps({
+            "autostart": widget_state.autostart_enabled(),
+            "always_on_top": self.always_on_top,
+        })
         self.context_menu.evaluate_js(f"renderContextMenu({data})")
 
     def close_context_menu(self):
@@ -665,7 +689,7 @@ class App:
         toast = _create_window(
             f"toast-{toast_id}", html=bundle_html("toast.html"),
             width=config.TOAST_W, height=config.TOAST_H, x=x, y=y,
-            frameless=True, on_top=True, resizable=False, shadow=False,
+            frameless=True, on_top=self.always_on_top, resizable=False, shadow=False,
             background_color=CARD_BG["toast.html"],
             easy_drag=False, min_size=(1, 1), js_api=Api(self),
             _round_corners=True,
@@ -834,7 +858,7 @@ class App:
         self.user_id_dialog = _create_window(
             "user_id_dialog", html=bundle_html("user_id_dialog.html"),
             width=w, height=h, x=x, y=y,
-            frameless=True, on_top=True, resizable=False, shadow=False,
+            frameless=True, on_top=self.always_on_top, resizable=False, shadow=False,
             background_color=CARD_BG["user_id_dialog.html"],
             easy_drag=False, min_size=(1, 1), js_api=Api(self),
             _round_corners=True, _scale_size=False,
@@ -902,7 +926,7 @@ class App:
         self.panel = _create_window(
             "panel", html=bundle_html(template),
             width=panel_w, height=panel_h, x=x, y=y,
-            frameless=True, on_top=True, resizable=False, shadow=False,
+            frameless=True, on_top=self.always_on_top, resizable=False, shadow=False,
             background_color=CARD_BG[template],
             easy_drag=False,  # 기본값 True면 목록 스크롤/클릭이 창 드래그로 먹힌다
             min_size=(1, 1), js_api=Api(self),

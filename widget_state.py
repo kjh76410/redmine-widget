@@ -11,6 +11,7 @@ import winreg
 from pathlib import Path
 
 POSITION_FILE = Path(__file__).parent / "widget_position.json"
+SETTINGS_FILE = Path(__file__).parent / "widget_settings.json"
 
 # 자동 실행은 HKCU\...\Run 레지스트리 값 하나로 처리한다. 시작프로그램 폴더에 바로가기를
 # 만드는 방법도 있지만 .lnk를 만들려면 COM(WScript.Shell)이 필요하고, .bat을 넣으면 부팅
@@ -40,6 +41,27 @@ def save_icon_position(x, y):
             json.dump({"x": int(x), "y": int(y)}, f, ensure_ascii=False, indent=2)
     except OSError:
         pass  # 위치 저장 실패로 위젯이 멈출 이유는 없다 - 다음 실행에 기본 자리로 뜬다
+
+
+def always_on_top_enabled():
+    """위젯(아이콘/패널)을 다른 창 위에 항상 띄울지. 기본값 True - pywebview
+    on_top=True로 만들던 원래 동작 그대로다(우클릭 메뉴에서 끄기 전까지는 그대로 유지)."""
+    if not SETTINGS_FILE.exists():
+        return True
+    try:
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return bool(data.get("always_on_top", True))
+    except (json.JSONDecodeError, OSError, TypeError):
+        return True
+
+
+def set_always_on_top(enabled):
+    try:
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump({"always_on_top": bool(enabled)}, f, ensure_ascii=False, indent=2)
+    except OSError:
+        pass  # 저장 실패해도 이번 실행 중엔 App.always_on_top(메모리)이 그대로 적용된다
 
 
 def _launch_command():
