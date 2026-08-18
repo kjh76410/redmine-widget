@@ -215,6 +215,83 @@ def _fake_search_all_projects_issues(query, source="company"):
     return hits
 
 
+# ── 배포 달력 ────────────────────────────────
+# 즐겨찾기 프로젝트별 배포 버전. (버전id, 이름, 오늘로부터 며칠, 버전상태)
+# 달력이 보여줘야 하는 경우가 한 화면에 다 나오도록 일부러 골라 뒀다:
+#   - 지연 3건을 최근/오래된 것 섞어서 (왼쪽 목록이 "최근 놓친 순"으로 서는지)
+#   - 오늘 나가는 배포 1건 (D-DAY 배지)
+#   - 같은 날(D+2)에 4건 몰림 (달력 칸이 2건만 보여주고 "+2건 더"로 접는지)
+#   - 이미 닫힌 버전 2건 (초록 "배포됨", 왼쪽 목록에는 안 뜨는 게 맞다)
+#   - 60일 밖 1건 ("그 이후 1건은 달력에서..." 안내)
+CALENDAR_VERSIONS = {
+    100: [  # CASPER
+        (9101, "v3.1.0 정기배포", -38, "closed"),
+        (9102, "v3.2.0 정기배포", -6, "open"),
+        (9103, "v3.3.0 기능추가", 2, "open"),
+        (9104, "v4.0.0 차세대 아키텍처 전환", 74, "open"),
+    ],
+    21: [  # 관제 플랫폼
+        (9201, "v2.8.1 긴급패치", -120, "open"),
+        (9202, "v2.9.0 정기배포", 0, "open"),
+        (9203, "v3.0.0 관제 화면 개편", 2, "open"),
+        (9204, "v3.0.1 안정화", 21, "open"),
+        (9205, "v3.0.2 긴급패치", 38, "open"),  # 추석 당일 - 공휴일 배포 경고 확인용
+    ],
+    110: [  # 사내포털
+        (9301, "v1.4.0 정기배포", -15, "closed"),
+        (9302, "v1.5.0 전자결재 연동", 2, "open"),
+        (9303, "v1.6.0 모바일 대응", 2, "open"),
+        (9304, "v1.7.0 정기배포", 40, "open"),
+    ],
+    500: [  # 소방 (팀 레드마인)
+        (9401, "v0.8 시범적용", -200, "open"),
+        (9402, "v0.9 파일럿", 9, "open"),
+        (9403, "v1.0 1차 납품", 35, "open"),
+    ],
+}
+
+
+def _fake_fetch_calendar_versions(projects):
+    """배포 달력. (project_id, 이름, source) 목록을 받아 종료일 오름차순 평면 목록으로.
+    진짜 함수와 같이, 종료일이 없는 버전은 애초에 담지 않는다."""
+    rows = []
+    for project_id, project_name, source in projects:
+        for version_id, name, offset, status in CALENDAR_VERSIONS.get(project_id, []):
+            rows.append({
+                "version_id": version_id,
+                "version": name,
+                "project": project_name,
+                "project_id": project_id,
+                "source": source,
+                "due_date": _day(offset),
+                "status": status,
+                "url": f"http://demo/versions/{version_id}",
+            })
+    rows.sort(key=lambda r: (r["due_date"], r["project"], r["version"]))
+    return rows
+
+
+# 닫힌 버전은 진행률도 100%여야 앞뒤가 맞는다(위 표에서 status가 "closed"인 것들).
+CLOSED_VERSION_IDS = {
+    vid for versions in CALENDAR_VERSIONS.values()
+    for vid, _name, _offset, status in versions if status == "closed"
+}
+
+
+def _fake_fetch_version_issue_counts(version_id, source="company"):
+    """날짜를 눌렀을 때 카드에 채워지는 진행률. 달력이 다뤄야 하는 세 갈래를 다 낸다:
+    정상 집계 / 연결된 일감 0건 / 조회 실패(None)."""
+    time.sleep(0.25)  # 진짜처럼 살짝 늦게 와야 "진행률 확인 중..." 자리가 보인다
+    n = int(version_id)
+    if n == 9203:
+        return None                       # 조회 실패 - 카드가 진행률만 빼고 멀쩡히 남는지
+    if n == 9302:
+        return {"total": 0, "closed": 0}  # 버전만 만들고 일감을 안 붙인 경우
+    total = 6 + (n % 5) * 4
+    closed = total if n in CLOSED_VERSION_IDS else round(total * ((n % 4) + 1) / 5)
+    return {"total": total, "closed": closed}
+
+
 FAVORITES = [
     {"id": 100, "name": "CASPER", "url": "http://demo/projects/100/issues",
      "source": "company", "notify": True},
@@ -238,15 +315,13 @@ def install():
     redmine_api.fetch_recent_issues = _fake_fetch_recent_issues
     redmine_api.fetch_issue = _fake_fetch_issue
     redmine_api.fetch_issues_by_version = _fake_fetch_issues_by_version
+    redmine_api.fetch_org_progress = _fake_fetch_org_progress
+    redmine_api.fetch_calendar_versions = _fake_fetch_calendar_versions
+    redmine_api.fetch_version_issue_counts = _fake_fetch_version_issue_counts
     redmine_api.fetch_current_user_id = lambda: 1
     redmine_api.resolve_user_id = lambda identifier: 1
     redmine_api.load_redmine_user_id = lambda: "demo"
     redmine_api.search_project_issues = _fake_search_project_issues
-
-    # main.py가 부르지만 redmine_api에는 아직 없는 함수들이다(README 아닌 실제 결함 -
-    # 진짜 앱에서는 팀별 진행상황/전체 프로젝트 검색이 AttributeError로 죽는다).
-    # 데모에서는 화면을 볼 수 있게 여기서 만들어 넣는다.
-    redmine_api.fetch_org_progress = _fake_fetch_org_progress
     redmine_api.search_all_projects_issues = _fake_search_all_projects_issues
 
     # 저장 계열은 전부 막는다 - 데모가 진짜 즐겨찾기/알림 기록/아이디 파일을 건드리면 안 된다.

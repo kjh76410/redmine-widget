@@ -23,6 +23,7 @@ import webview
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import config
+import korean_holidays
 import redmine_api
 import widget_state
 
@@ -89,6 +90,7 @@ CARD_BG = {
     "issues_panel.html": "#F1F3F5",
     "resolved_panel.html": "#F1F3F5",
     "team_progress.html": "#F1F3F5",
+    "calendar_panel.html": "#F1F3F5",
     "toast.html": "#F1F3F5",
 }
 
@@ -258,6 +260,7 @@ PANEL_SPEC = {
     "favorites": ("issues_panel.html", 1100, 680),
     "resolved_by_version": ("resolved_panel.html", 1100, 680),
     "team_progress": ("team_progress.html", 1100, 680),
+    "deploy_calendar": ("calendar_panel.html", 1100, 680),
 }
 
 
@@ -340,6 +343,9 @@ class Api:
     def get_team_progress(self, project_id):
         return self._app.get_team_progress(project_id)
 
+    def get_version_progress(self, version_id, source):
+        return self._app.get_version_progress(version_id, source)
+
     def open_toast_url(self, toast_id, url):
         self._app.open_toast_url(toast_id, url)
 
@@ -408,6 +414,10 @@ class App:
         self.favorites = redmine_api.load_favorites()
         self.favorite_issues = {}  # f"{source}:{id}" -> issues 리스트(처음엔 최근 200건)
         self.favorite_issue_totals = {}  # f"{source}:{id}" -> 전체 이슈 개수
+        # 배포 달력이 쓰는 버전 목록. None은 "아직 한 번도 안 불러옴"이고 []는 "불러왔는데
+        # 종료일 잡힌 버전이 없음"이라, 화면이 "불러오는 중"과 "없음"을 구분할 수 있어야
+        # 해서 굳이 나눠 둔다(_render_calendar 참고).
+        self.calendar_versions = None
 
         self.user_id_dialog = None
         self._pending_my_issues_open = False  # 아이디 설정 후 "할당된 일감"을 이어서 열지 여부
@@ -938,6 +948,8 @@ class App:
             self.panel.events.loaded += self._push_resolved_tree
         elif kind == "team_progress":
             self.panel.events.loaded += self._push_team_progress_tree
+        elif kind == "deploy_calendar":
+            self.panel.events.loaded += self._push_calendar
         else:
             self.panel.events.loaded += self._push_issues
             if kind == "my_issues" and not self.my_issues:
@@ -1023,6 +1035,53 @@ class App:
         for (_pid, _name, team_index), r in zip(flat, flat_results):
             result[team_index]["subgroups"].append(r)
         return result
+
+    # ── 배포 달력 ─────────────────────────────────
+    # 즐겨찾기한 프로젝트의 배포 버전(종료일이 잡힌 것)을 달마다 점으로 찍어 보여주는
+    # 화면. 다른 화면들과 달리 왼쪽에서 프로젝트를 고를 필요가 없다 - 즐겨찾기 전체를
+    # 가로질러 "언제 무엇이 나가는지"를 한 번에 보는 게 이 화면의 존재 이유라서다.
+    def _push_calendar(self):
+        # 캐시가 있으면 그걸로 즉시 그려서 창이 비어 보이지 않게 하고, 그 뒤에 항상
+        # 다시 받아온다 - 배포일은 자주 바뀌진 않지만 창을 열 때만큼은 최신이어야 한다.
+        self._render_calendar()
+        self.refresh_calendar()
+
+    def refresh_calendar(self):
+        threading.Thread(target=self._reload_calendar, daemon=True).start()
+
+    def _reload_calendar(self):
+        pairs = [
+            (f["id"], f["name"], f.get("source", "company")) for f in self.favorites
+        ]
+        self.calendar_versions = redmine_api.fetch_calendar_versions(pairs)
+        if self.panel_kind == "deploy_calendar":
+            self._render_calendar()
+
+    def _render_calendar(self):
+        if self.panel is None:
+            return
+        versions = self.calendar_versions
+        data = json.dumps(
+            {
+                "versions": versions or [],
+                "loading": versions is None,
+                # 즐겨찾기가 아예 없으면 "버전이 없다"가 아니라 "즐겨찾기부터 하라"고
+                # 안내해야 해서, 화면이 두 경우를 구분할 수 있게 같이 넘긴다.
+                "has_favorites": bool(self.favorites),
+                "today": time.strftime("%Y-%m-%d"),
+                # 달력은 달을 넘길 때 서버에 다시 묻지 않으므로(전부 클라이언트에서
+                # 그린다) 공휴일도 창을 열 때 아는 연도치를 통째로 넘겨둔다.
+                # 수백 건이 아니라 수십 건이라 payload에 부담이 없다.
+                "holidays": korean_holidays.holidays_between(*korean_holidays.known_years()),
+            },
+            ensure_ascii=False,
+        )
+        self.panel.evaluate_js(f"renderCalendarPanel({data})")
+
+    def get_version_progress(self, version_id, source):
+        """달력에서 날짜를 눌렀을 때 그 날 나가는 버전의 진행률을 센다.
+        실패하면 None - 화면은 진행률만 빼고 나머지를 그대로 보여준다."""
+        return redmine_api.fetch_version_issue_counts(version_id, source)
 
     def _push_issues(self):
         if self.panel is None:

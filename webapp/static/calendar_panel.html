@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="calendar_panel.css">
+</head>
+<body>
+<div id="win">
+    <div id="cols">
+        <div id="colUpcoming" class="col"></div>
+        <div class="divider"></div>
+        <div id="colCalendar">
+            <div id="calHeader">
+                <button class="nav" id="prevMonth" title="이전 달">&lsaquo;</button>
+                <span id="monthLabel"></span>
+                <button class="nav" id="nextMonth" title="다음 달">&rsaquo;</button>
+                <button class="today-btn" id="todayBtn">오늘</button>
+                <span class="legend">
+                    <span class="key"><i class="dot planned"></i>예정</span>
+                    <span class="key"><i class="dot late"></i>지연</span>
+                    <span class="key"><i class="dot done"></i>배포됨</span>
+                </span>
+            </div>
+            <div id="weekdays"></div>
+            <div id="grid"></div>
+        </div>
+    </div>
+</div>
+<script src="calendar_panel.js"></script>
+</body>
+</html>
