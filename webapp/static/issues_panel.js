@@ -88,7 +88,15 @@ function renderLeft() {
         if (g.section && g.section !== lastSection) {
             const head = document.createElement("div");
             head.className = "section";
-            head.textContent = g.section;
+            const label = document.createElement("span");
+            label.textContent = g.section;
+            head.appendChild(label);
+            // 즐겨찾기 창에서만 - 이 구분자에 속한 프로젝트들의 알림을 한꺼번에 켜고 끈다.
+            // "할당된 일감" 창의 구분자는 최상위 프로젝트 이름이라(_my_issues_groups
+            // 참고) source도 notify도 없으므로 버튼이 안 붙는다.
+            if (currentKind === "favorites" && g.source) {
+                head.appendChild(makeSectionBell(g.source));
+            }
             left.appendChild(head);
             lastSection = g.section;
         }
@@ -156,6 +164,42 @@ function makeBell(group) {
         });
     });
     return bell;
+}
+
+// 한 구분자(레드마인 서버 하나)에 속한, 종을 가진 프로젝트들.
+function sectionGroups(source) {
+    return currentGroups.filter((g) => g.source === source && g.notify != null);
+}
+
+// 구분자 오른쪽의 "전체 알림" 버튼 - 그 레드마인의 즐겨찾기 프로젝트 종을 한꺼번에
+// 켜고 끈다. 버튼 하나로 두 방향을 다 하므로, 하나라도 켜져 있으면 "전체 알림 끄기",
+// 다 꺼져 있으면 "전체 알림 켜기"로 글자가 곧 다음에 일어날 일이 되게 한다
+// (지금 상태를 적어두면 눌렀을 때 뭐가 될지 반대로 읽히기 쉽다).
+function makeSectionBell(source) {
+    const btn = document.createElement("button");
+    btn.className = "section-bell";
+
+    function paint() {
+        const anyOn = sectionGroups(source).some((g) => g.notify);
+        btn.textContent = anyOn ? "전체 알림 끄기" : "전체 알림 켜기";
+        btn.title = anyOn
+            ? "이 레드마인의 즐겨찾기 프로젝트 알림을 모두 끕니다"
+            : "이 레드마인의 즐겨찾기 프로젝트 알림을 모두 켭니다";
+        btn.classList.toggle("off", !anyOn);
+    }
+    paint();
+
+    btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const next = !sectionGroups(source).some((g) => g.notify);
+        window.pywebview.api.set_notify_all(source, next).then((on) => {
+            sectionGroups(source).forEach((g) => { g.notify = on; });
+            // 종이 여러 개 한꺼번에 바뀌니 카드마다 고치지 않고 왼쪽만 다시 그린다.
+            // 선택된 프로젝트(selectedIndex)는 그대로라 오른쪽 목록은 안 건드린다.
+            renderLeft();
+        });
+    });
+    return btn;
 }
 
 function filteredIssues() {

@@ -14,10 +14,15 @@
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const UPCOMING_DAYS = 60;  // "다가오는 일정"에 담을 기간 - 그 뒤는 건수만 알려준다
-// 달력 한 칸에 이름까지 보여줄 버전 개수. 칸 높이(창 680px에서 6주면 한 칸 약 100px)가
-// 날짜 숫자 + 칩 2줄 + "+N건 더" 한 줄까지만 감당한다 - 3줄을 넣으면 마지막 칩이 칸
-// 아래로 잘린다(.items가 overflow:hidden이라 소리 없이 잘려서 더 나쁘다).
-const MAX_CHIPS = 2;
+// 달력 한 칸에 이름까지 보여줄 버전 개수. 칸 안에서 칩이 쓸 수 있는 자리(.items)가
+// 이만큼만 감당한다 - .items가 overflow:hidden이라 넘치면 소리 없이 잘려서, 넉넉히
+// 잡는 쪽이 아니라 확실히 들어가는 쪽으로 골라야 한다.
+// 칩 한 줄 17px(font 10 x line-height 1.5 + 상하 padding 1), 줄 간격 2px,
+// "+N건 더" 줄 13.3px 기준:
+//   창 680px 시절 -> .items 54px. 칩 2개(51.3px)까지. 3개는 15.9px 모자랐다.
+//   창 850px 지금 -> .items 80px. 칩 3개(70.3px)까지. 4개는 9.2px 모자란다.
+// 창 높이(main.py PANEL_SPEC)를 바꾸면 이 값도 다시 재야 한다.
+const MAX_CHIPS = 3;
 
 let versions = [];
 let byDate = new Map();     // "YYYY-MM-DD" -> [version, ...]

@@ -36,8 +36,10 @@ html, body {
     padding: 4px 8px 12px;
 }
 
-/* "버전별 연결된 일감"(resolved_panel.css의 #colProject)과 같은 폭 - 두 창 다 같은
-   1100px 창이라(main.py PANEL_SPEC) px 값이 그대로 같아진다. */
+/* "버전별 연결된 일감"(resolved_panel.css의 #colProject)과 같은 폭 - 툴바에서 두 창을
+   오갈 때 왼쪽 목록 폭이 안 튀어야 한다. 두 창 다 CSS 픽셀 고정으로 맞춰 두었으므로
+   (비율로 적으면 화면 배율에 따라 갈라진다 - #colProject 주석 참고) 한쪽을 바꾸면
+   다른 쪽도 같이 바꿔야 한다. */
 #colTeam { width: 240px; flex: none; }
 #colVersion { flex: 1; }
 

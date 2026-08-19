@@ -183,10 +183,43 @@ html, body {
 }
 
 .section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
     color: #5A6B85;
     font-size: 11px;
     font-weight: 700;
     padding: 10px 6px 4px;
+}
+
+/* 구분자 오른쪽의 "전체 알림" 버튼 - 프로젝트마다 달린 종(.bell)이 주된 조작이고
+   이건 가끔 쓰는 일괄 처리라, 구분자 글자보다도 눈에 덜 띄는 외곽선 버튼으로 둔다. */
+.section-bell {
+    flex: none;
+    padding: 2px 7px;
+    border: 1px solid #C3CBD9;
+    border-radius: 6px;
+    background: transparent;
+    color: #5A6B85;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.5;
+    cursor: pointer;
+}
+
+.section-bell:hover {
+    background: #DBE2ED;
+    border-color: #8E9AAE;
+    color: #152340;
+}
+
+/* 다 꺼져 있는 상태(= 누르면 켜진다) - 이 구분자엔 지금 알림이 하나도 없다는 게
+   글자를 읽기 전에 흐린 색만으로도 보이게. */
+.section-bell.off {
+    border-color: #D7DBE2;
+    color: #A5ADBA;
 }
 
 .project-card {

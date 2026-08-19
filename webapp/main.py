@@ -250,18 +250,28 @@ ISSUES_TITLES = {
 MY_ISSUES_SEEN_KEY = "my_issues"
 MY_ISSUES_TOAST_HEADING = "나에게 할당됨"
 
+# 패널과 아이콘 사이 세로 간격(물리 px). 패널은 아이콘 바로 위에 붙어서 뜬다.
+_PANEL_ICON_GAP = 8
+# 화면이 좁아 패널을 줄여야 할 때의 하한(물리 px). 여기까지 줄면 아이콘을 덮게 되는데,
+# 목록이 한 줄도 안 보이는 창을 여는 것보다는 낫다.
+_PANEL_MIN_H = 240
+
 # kind -> (템플릿 파일, 창 너비, 창 높이)
+# 창 크기는 물리 픽셀이다(_create_window의 _scale_size 기본값 True - _apply_geometry 참고).
+# 높이 850은 1920x1080에서 아이콘 위에 남는 자리를 거의 다 쓰는 값이라, 더 작은 화면에서
+# 그대로 쓰면 위쪽이 잘린다 - App._panel_geometry가 들어가는 만큼으로 줄여서 연다.
 PANEL_SPEC = {
-    "company_tree": ("panel.html", 300, 680),
-    "team_tree": ("panel.html", 300, 680),
-    # 일감/즐겨찾기/연결된 일감/팀별 진행상황 네 창은 같은 크기로 맞춰 둔다(툴바에서
-    # 서로 오갈 때 창이 안 흔들리게) - 팀별 진행상황의 Month 그리드 자리를 넓히려고
-    # 네 창 다 1000 -> 1100으로 같이 늘렸다.
-    "my_issues": ("issues_panel.html", 1100, 680),
-    "favorites": ("issues_panel.html", 1100, 680),
-    "resolved_by_version": ("resolved_panel.html", 1100, 680),
-    "team_progress": ("team_progress.html", 1100, 680),
-    "deploy_calendar": ("calendar_panel.html", 1100, 680),
+    "company_tree": ("panel.html", 300, 850),
+    "team_tree": ("panel.html", 300, 850),
+    # 일감/즐겨찾기/연결된 일감/팀별 진행상황/배포 달력 다섯 창은 같은 크기로 맞춰 둔다
+    # (툴바에서 서로 오갈 때 창이 안 흔들리게) - 팀별 진행상황의 Month 그리드 자리를
+    # 넓히려고 다 1000 -> 1100으로 같이 늘렸고, 아이콘 위로 놀고 있던 자리를 쓰려고
+    # 높이도 680 -> 850으로 같이 늘렸다(트리 두 창도 같은 높이로 맞춘다).
+    "my_issues": ("issues_panel.html", 1100, 850),
+    "favorites": ("issues_panel.html", 1100, 850),
+    "resolved_by_version": ("resolved_panel.html", 1100, 850),
+    "team_progress": ("team_progress.html", 1100, 850),
+    "deploy_calendar": ("calendar_panel.html", 1100, 850),
 }
 
 
@@ -337,6 +347,9 @@ class Api:
 
     def toggle_notify(self, project_id, source):
         return self._app.toggle_notify(project_id, source)
+
+    def set_notify_all(self, source, on):
+        return self._app.set_notify_all(source, on)
 
     def get_resolved_by_version(self, project_id):
         return self._app.get_resolved_by_version(project_id)
@@ -545,7 +558,7 @@ class App:
         w, h = 200, 192
         x = self.icon_x
         # y는 물리 픽셀이라 창이 실제로 차지하는 물리 높이(= CSS 높이 x 배율)를 빼야 한다.
-        y = max(self.icon_y - 8 - round(h * _DPI_SCALE), 0)
+        y = max(self.icon_y - _PANEL_ICON_GAP - round(h * _DPI_SCALE), 0)
         self.context_menu = _create_window(
             "context_menu", html=bundle_html("context_menu.html"),
             width=w, height=h, x=x, y=y,
@@ -857,6 +870,23 @@ class App:
                 return f["notify"]
         return True
 
+    def set_notify_all(self, source, on):
+        """한 레드마인(source)에 속한 즐겨찾기 프로젝트의 알림을 한꺼번에 켜고 끈다.
+        구분자 줄의 "전체 알림" 버튼이 쓴다 - 프로젝트가 십수 개씩 되면 종을 하나씩
+        누르는 게 일이라서. 반환값은 적용된 상태.
+
+        toggle_notify와 같은 이유로 _push_issues는 안 한다 - 목록 내용은 그대로고
+        종 모양만 바뀌므로, 화면 쪽에서 왼쪽 목록만 다시 그리는 게 싸다."""
+        on = bool(on)
+        changed = False
+        for f in self.favorites:
+            if f.get("source", "company") == source and f.get("notify", True) != on:
+                f["notify"] = on
+                changed = True
+        if changed:
+            redmine_api.save_favorites(self.favorites)
+        return on
+
     # ── "할당된 일감" 조회용 로그인 아이디 설정 ──────
     def open_user_id_dialog(self):
         if self.user_id_dialog is not None:
@@ -872,7 +902,7 @@ class App:
         # 버튼 사이 간격이 된다. 문구를 고치면 이 두 값도 다시 재야 한다.
         w, h = 380, 204
         x = self.icon_x
-        y = max(self.icon_y - 8 - round(h * _DPI_SCALE), 0)
+        y = max(self.icon_y - _PANEL_ICON_GAP - round(h * _DPI_SCALE), 0)
         self.user_id_dialog = _create_window(
             "user_id_dialog", html=bundle_html("user_id_dialog.html"),
             width=w, height=h, x=x, y=y,
@@ -910,6 +940,21 @@ class App:
             self.open_panel("my_issues")
 
     # ── 패널 열기/닫기(토글) ──────────────────────
+    def _panel_geometry(self, panel_w, panel_h):
+        """PANEL_SPEC 크기를 이 화면에 들어가는 만큼으로 자르고, 아이콘 바로 위에
+        붙는 좌표까지 같이 돌려준다(x, y, w, h - 전부 물리 px).
+
+        PANEL_SPEC 값은 1920x1080 기준으로 잡아 둔 거라, 더 작은 화면(노트북 등)이나
+        아이콘을 화면 위쪽으로 끌어다 둔 상태에서 그대로 열면 창 위쪽이 화면 밖으로
+        잘려 나간다. 패널은 아이콘 위에 붙으므로 세로 상한은 "아이콘 위에 남은 자리"고,
+        가로는 왼쪽으로 밀어서 맞추되 그래도 넘치면 화면 너비까지 줄인다.
+        _clamp_icon_pos와 같은 이유로 필요한 처리다."""
+        panel_h = min(panel_h, max(self.icon_y - _PANEL_ICON_GAP, _PANEL_MIN_H))
+        panel_w = min(panel_w, self.screen_w)
+        x = min(self.icon_x, max(self.screen_w - panel_w, 0))
+        y = max(self.icon_y - _PANEL_ICON_GAP - panel_h, 0)
+        return x, y, panel_w, panel_h
+
     # 모든 패널은 같은 self.panel 슬롯 하나를 재사용한다 - 팝업으로 따로 안 튀어나오고
     # 항상 위젯 아이콘 바로 위(같은 위치)에 뜨게 하기 위함이다.
     def open_panel(self, kind):
@@ -939,8 +984,7 @@ class App:
 
         self.panel_kind = kind
         template, panel_w, panel_h = PANEL_SPEC[kind]
-        x = self.icon_x
-        y = max(self.icon_y - 8 - panel_h, 0)
+        x, y, panel_w, panel_h = self._panel_geometry(panel_w, panel_h)
         self.panel = _create_window(
             "panel", html=bundle_html(template),
             width=panel_w, height=panel_h, x=x, y=y,
@@ -1200,10 +1244,12 @@ class App:
         if self.panel is None:
             return
         versions = self.calendar_versions
+        # holidays_for_year가 이미 {"YYYY-MM-DD": 이름} 꼴로 주므로(화면이 쓰는 모양
+        # 그대로라 변환할 게 없다) 연도별 결과를 그냥 합치기만 한다. 음력 표에 없는
+        # 연도는 빈 dict가 아니라 양력 공휴일만 담겨 오므로 따로 거를 필요도 없다.
         holidays = {}
         for year in self._calendar_years():
-            for day, name in korean_holidays.get_holidays(year).items():
-                holidays[day.isoformat()] = name
+            holidays.update(korean_holidays.holidays_for_year(year))
         data = json.dumps(
             {
                 "versions": versions or [],

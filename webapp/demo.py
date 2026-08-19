@@ -86,7 +86,9 @@ def _issue(n, project_name=None):
     }
 
 
-MY_ISSUES = [_issue(n, ["CASPER", "사내포털", "관제 플랫폼"][n % 3]) for n in range(23)]
+# 개수는 창 높이(PANEL_SPEC 850px)에 들어가는 행 수보다 넉넉해야 한다 - 34px짜리
+# 행이 22개쯤 들어가므로, 40건이면 스크롤과 "아래에 더 있다"가 확실히 확인된다.
+MY_ISSUES = [_issue(n, ["CASPER", "사내포털", "관제 플랫폼"][n % 3]) for n in range(40)]
 for _i, _issue_dict in enumerate(MY_ISSUES):
     _issue_dict["project_id"] = [100, 110, 21][_i % 3]
 
@@ -137,13 +139,15 @@ def _fake_fetch_issue(issue_id, source="company"):
 def _fake_fetch_issues_by_version(project_id):
     """버전별 연결된 일감.
     반환 형식은 [{"version":, "due_date":, "issues":[{"id","subject","url"}]}]."""
-    labels = ["정기배포", "긴급패치", "기능추가", "안정화"]
+    labels = ["정기배포", "긴급패치", "기능추가", "안정화", "성능개선", "보안패치"]
     # 끝난 상태(closed=True로 칠 것)와 진행 중 상태를 섞어 둔다
     OPEN_STATUSES = ["신규", "진행", "피드백", "보류"]
     DONE_STATUSES = ["완료", "종료", "거부"]
 
     groups = []
-    for v in range(1, 5):
+    # 버전 6개 - 850px 창에 36px 행이 21개쯤 들어가는데, 6개면 일감이 33건이라
+    # 목록이 확실히 넘쳐서 스크롤까지 같이 확인된다.
+    for v in range(1, 7):
         count = 3 + v
         # 첫 버전은 전부 끝난 것으로 - 완료된 버전의 초록 뱃지도 같이 보이게
         done_upto = count if v == 1 else v
@@ -172,7 +176,9 @@ def _fake_fetch_org_progress(pairs):
     result = []
     for idx, (pid, name) in enumerate(pairs):
         versions = []
-        for v in range(3):
+        # 팀당 5개 - 즐겨찾기 4팀 x 5 = 20행(27px)이라 850px 창을 거의 채운다.
+        # Month 그리드도 그만큼 겹쳐서 막대가 촘촘하게 깔린 모습을 볼 수 있다.
+        for v in range(5):
             total = 8 + v * 4
             percent = [100, 60, 20][(idx + v) % 3]
             start_month = 1 + ((idx + v * 3) % 8)
@@ -220,7 +226,8 @@ def _fake_search_all_projects_issues(query, source="company"):
 # 달력이 보여줘야 하는 경우가 한 화면에 다 나오도록 일부러 골라 뒀다:
 #   - 지연 3건을 최근/오래된 것 섞어서 (왼쪽 목록이 "최근 놓친 순"으로 서는지)
 #   - 오늘 나가는 배포 1건 (D-DAY 배지)
-#   - 같은 날(D+2)에 4건 몰림 (달력 칸이 2건만 보여주고 "+2건 더"로 접는지)
+#   - 같은 날(D+2)에 4건 몰림 (달력 칸이 MAX_CHIPS개만 보여주고 나머지를 "+N건 더"로
+#     접는지 - 지금은 3개까지 보여주므로 "+1건 더"가 된다)
 #   - 이미 닫힌 버전 2건 (초록 "배포됨", 왼쪽 목록에는 안 뜨는 게 맞다)
 #   - 60일 밖 1건 ("그 이후 1건은 달력에서..." 안내)
 CALENDAR_VERSIONS = {
