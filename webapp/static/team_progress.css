@@ -36,7 +36,9 @@ html, body {
     padding: 4px 8px 12px;
 }
 
-#colTeam { width: 190px; flex: none; }
+/* "버전별 연결된 일감"(resolved_panel.css의 #colProject)과 같은 폭 - 두 창 다 같은
+   1100px 창이라(main.py PANEL_SPEC) px 값이 그대로 같아진다. */
+#colTeam { width: 240px; flex: none; }
 #colVersion { flex: 1; }
 
 .divider {

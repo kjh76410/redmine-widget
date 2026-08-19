@@ -42,7 +42,7 @@ ICON_GLYPH_PAD = 10       # 아이콘 배경 안쪽에서 실제 그림이 차�
 MARGIN      = 20          # 화면 가장자리로부터의 여백(px)
 
 # 메인 아이콘 옆에 뜨는 퀵 툴바(할당된 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 / 버전별 연결된 일감 /
-# 팀별 진행상황 원형 아이콘 6개) 설정
+# 팀별 진행상황 / 배포 달력 원형 아이콘 7개) 설정
 # 아이콘 칸 크기/간격은 shell.css와 같은 값이어야 한다 - 셸 창 너비를 이 값들로 계산하는데,
 # 창 사각형이 곧 눈에 보이는 바라서 어긋나면 빈 남색이 붙거나 마지막 아이콘이 잘린다
 # (webapp/main.py의 _round_window_corners / App.shell_w 설명 참고).
@@ -51,7 +51,7 @@ QUICK_TOOLBAR_RADIUS     = 12   # 아이콘 배경 둥근 네모의 모서리 �
 QUICK_TOOLBAR_GLYPH_PAD  = 9    # 배경 안쪽에서 실제 그림이 차지하는 여백(px, 사방 동일) - 메인 아이콘과 비슷한 비율
 QUICK_TOOLBAR_GAP        = 0    # 아이콘 사이 간격(px) - 0(빈틈없이 이어진 바)
 QUICK_TOOLBAR_MARGIN     = 0    # 메인 아이콘과 퀵 툴바 사이 가로 간격(px) - 0(같은 바 안이라 붙는다)
-QUICK_TOOLBAR_BUTTON_COUNT = 6  # 아이콘 개수(할당된 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 / 버전별 연결된 일감 / 팀별 진행상황)
+QUICK_TOOLBAR_BUTTON_COUNT = 7  # 아이콘 개수(할당된 일감 / 즐겨찾기 / 전체 프로젝트 / 팀 레드마인 / 버전별 연결된 일감 / 팀별 진행상황 / 배포 달력)
 QUICK_TOOLBAR_TOTAL_W = (
     QUICK_TOOLBAR_ICON_SIZE * QUICK_TOOLBAR_BUTTON_COUNT
     + QUICK_TOOLBAR_GAP * (QUICK_TOOLBAR_BUTTON_COUNT - 1)
@@ -117,6 +117,12 @@ FAVORITES_FILE = Path(__file__).parent / "redmine_favorites.json"
 
 # 즐겨찾기한 프로젝트에서 이미 알림을 보낸 이슈 id 목록이 저장되는 파일 (앱을 다시 실행해도 유지됨)
 SEEN_ISSUES_FILE = Path(__file__).parent / "redmine_seen_issues.json"
+
+# "버전별 연결된 일감" / "팀별 진행상황" 화면이 마지막으로 받아온 결과를 저장해 두는
+# 파일 - 패널을 열 때마다 레드마인 응답을 기다리지 않고 이 캐시부터 보여준 뒤, 뒤에서
+# 새로 받아와 갱신한다(App.get_resolved_by_version / get_team_progress 참고).
+RESOLVED_BY_VERSION_CACHE_FILE = Path(__file__).parent / "redmine_resolved_by_version_cache.json"
+TEAM_PROGRESS_CACHE_FILE = Path(__file__).parent / "redmine_team_progress_cache.json"
 
 # 새 이슈를 확인하는 주기(ms)
 NOTIFY_POLL_INTERVAL_MS = 60 * 1000

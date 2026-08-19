@@ -12,12 +12,15 @@
 // 이 화면은 "무엇이 진행 중인지" 간트차트로만 훑어보는 용도라 일감 목록/진행률 막대/
 // 클릭 상호작용은 없다.
 let selectedTeamRow = null;
+let selectedProjectId = null;  // 지금 오른쪽에 펼쳐놓은 조직/팀의 id - updateOrgCol이 그 사이
+                                // 다른 걸 골랐으면(불일치) 백그라운드 새로고침 결과를 버리는 데 쓴다
 let loadToken = 0;
 
 function renderTeamProgressPanel(data) {
     const col = document.getElementById("colTeam");
     col.innerHTML = "";
     selectedTeamRow = null;
+    selectedProjectId = null;
     renderPlaceholder("colVersion", "왼쪽에서 조직/팀을 선택하세요.");
 
     const teams = data.teams || [];
@@ -83,6 +86,7 @@ function selectOrg(node, row) {
     if (selectedTeamRow) selectedTeamRow.classList.remove("selected");
     row.classList.add("selected");
     selectedTeamRow = row;
+    selectedProjectId = node.id;
 
     renderPlaceholder("colVersion", "불러오는 중...");
 
@@ -96,6 +100,13 @@ function selectOrg(node, row) {
     });
 }
 
+// 파이썬(App._refresh_team_progress)이 캐시를 먼저 보여준 뒤 백그라운드로 새로 받아온
+// 최신 데이터를 밀어줄 때 부르는 진입점. 그 사이 다른 조직/팀을 골랐으면 조용히 버린다.
+function updateOrgCol(projectId, orgTeams) {
+    if (projectId !== selectedProjectId) return;
+    renderOrgCol(orgTeams || []);
+}
+
 function renderOrgCol(orgTeams) {
     const col = document.getElementById("colVersion");
     col.innerHTML = "";
@@ -103,70 +114,66 @@ function renderOrgCol(orgTeams) {
         renderPlaceholder("colVersion", "하위 프로젝트가 없습니다.");
         return;
     }
-    orgTeams.forEach((team, i) => col.appendChild(renderTeamSection(team, i > 0)));
+
+    // 로드맵(버전)이 하나도 없는 팀/프로젝트는 "버전이 없습니다" 같은 빈 안내문 대신
+    // 통째로 건너뛴다 - 보여줄 게 없으면 아예 안 보이는 쪽이, 팀마다 빈 칸이 죽
+    // 늘어서는 것보다 낫다(renderTeamSection이 보여줄 게 없으면 null을 돌려준다).
+    const sections = orgTeams.map((team) => renderTeamSection(team)).filter((s) => s !== null);
+    if (sections.length === 0) {
+        renderPlaceholder("colVersion", "버전이 지정된 로드맵이 없습니다.");
+        return;
+    }
+    sections.forEach((section, i) => {
+        if (i > 0) section.classList.add("with-divider");
+        col.appendChild(section);
+    });
 }
 
 const MONTH_NAMES = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
-function renderTeamSection(team, withDivider) {
+// 팀 섹션 하나를 만들어 돌려준다. 이번 연도 마감 예정 버전이 하나도 없는 하위
+// 프로젝트는 renderSubgroup이 null을 돌려주니 그런 것만 걸러내고, 남는 게 없으면
+// 이 팀 섹션 자체도 null로 돌려서(보여줄 게 없다) 위(renderOrgCol)에서 건너뛰게 한다.
+function renderTeamSection(team) {
+    const subgroups = (team.subgroups || []).map(renderSubgroup).filter((el) => el !== null);
+    if (subgroups.length === 0) return null;
+
     const section = document.createElement("div");
-    section.className = "team-section" + (withDivider ? " with-divider" : "");
+    section.className = "team-section";
 
     const heading = document.createElement("div");
     heading.className = "team-heading";
     heading.textContent = team.team;
     section.appendChild(heading);
 
-    const subgroups = team.subgroups || [];
-    if (subgroups.length === 0) {
-        const p = document.createElement("div");
-        p.className = "placeholder";
-        p.textContent = "하위 프로젝트가 없습니다.";
-        section.appendChild(p);
-        return section;
-    }
-
-    subgroups.forEach((sub, i) => section.appendChild(renderSubgroup(sub, i > 0)));
+    subgroups.forEach((el, i) => {
+        if (i > 0) el.classList.add("with-divider");
+        section.appendChild(el);
+    });
     return section;
 }
 
-// 팀(depth 1) 섹션 안에서 depth 2 프로젝트마다 나뉘는 소그룹 하나. 예를 들어
-// "MCX솔루션 개발팀" 섹션 안에 "국내 프로젝트"/"해외 프로젝트" 소그룹이 구분자로
-// 나뉘어 들어간다.
-function renderSubgroup(sub, withDivider) {
+// 팀(depth 1) 섹션 안에서 depth 2 프로젝트마다 나뉘는 소그룹 하나(예: "MCX솔루션
+// 개발팀" 섹션 안의 "국내 프로젝트"/"해외 프로젝트"). 이 화면은 올해 마감인 버전만
+// Month 그리드에 올리는데(그 외는 그리드에 놓을 축 좌표가 없어서 뺀다 - 진행률
+// 막대 같은 대체 표시는 안 둔다), 올해 마감인 게 하나도 없으면 "없습니다" 안내문
+// 대신 이 소그룹 자체를 안 보여준다(null 반환) - 보여줄 게 없으면 아예 안 보이는
+// 쪽이 팀마다 빈 칸이 죽 늘어서는 것보다 낫다.
+function renderSubgroup(sub) {
+    const thisYear = new Date().getFullYear();
+    const ganttGroups = (sub.versions || []).filter(
+        (g) => g.due_date && new Date(g.due_date + "T00:00:00").getFullYear() === thisYear
+    );
+    if (ganttGroups.length === 0) return null;
+    ganttGroups.sort((a, b) => (a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : 0));
+
     const wrap = document.createElement("div");
-    wrap.className = "subgroup" + (withDivider ? " with-divider" : "");
+    wrap.className = "subgroup";
 
     const heading = document.createElement("div");
     heading.className = "subgroup-heading";
     heading.textContent = sub.team;
     wrap.appendChild(heading);
-
-    const versionGroups = sub.versions || [];
-    if (versionGroups.length === 0) {
-        const p = document.createElement("div");
-        p.className = "placeholder";
-        p.textContent = "버전이 지정된 이슈가 없습니다.";
-        wrap.appendChild(p);
-        return wrap;
-    }
-
-    // 올해(1월~12월) 마감인 버전만 Month 그리드에 올린다 - 그 외(다른 연도 마감이거나
-    // 마감일이 아예 없는 버전)는 그리드에 놓을 축 좌표가 없어서 간트차트에서는 뺀다
-    // (진행률 막대 같은 대체 표시는 안 둔다 - 이 화면은 간트차트만 있으면 된다).
-    const thisYear = new Date().getFullYear();
-    const ganttGroups = versionGroups.filter(
-        (g) => g.due_date && new Date(g.due_date + "T00:00:00").getFullYear() === thisYear
-    );
-    ganttGroups.sort((a, b) => (a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : 0));
-
-    if (ganttGroups.length === 0) {
-        const p = document.createElement("div");
-        p.className = "placeholder";
-        p.textContent = `${thisYear}년 마감 예정인 버전이 없습니다.`;
-        wrap.appendChild(p);
-        return wrap;
-    }
 
     wrap.appendChild(renderGanttHeader(thisYear));
     ganttGroups.forEach((group) => wrap.appendChild(renderGanttRow(group, thisYear)));

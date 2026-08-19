@@ -8,6 +8,7 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from config import (
     FAVORITES_FILE,
@@ -15,7 +16,9 @@ from config import (
     REDMINE_API_KEY_PLACEHOLDER,
     REDMINE_BASE_URL,
     REDMINE_USER_ID_FILE,
+    RESOLVED_BY_VERSION_CACHE_FILE,
     SEEN_ISSUES_FILE,
+    TEAM_PROGRESS_CACHE_FILE,
     TEAM_REDMINE_API_KEY_FILE,
     TEAM_REDMINE_BASE_URL,
 )
@@ -319,10 +322,10 @@ def fetch_project_issue_list(project_id, source="company", offset=0, limit=200):
 
 
 def fetch_versions_meta(project_id, api_key=None):
-    """{버전id: {"due_date":, "created_on":}} 를 돌려준다.
+    """{버전id: {"name":, "due_date":, "created_on":, "status":}} 를 돌려준다.
 
     이슈 조회(issues.json)가 딸려 보내주는 fixed_version에는 id와 이름밖에 없어서,
-    종료일/생성일은 프로젝트의 버전 목록을 따로 받아야 알 수 있다. created_on은
+    종료일/생성일/상태는 프로젝트의 버전 목록을 따로 받아야 알 수 있다. created_on은
     타임스탬프("2026-01-05T02:00:00Z")로 오길래 날짜만 잘라 쓴다(team_progress
     간트차트가 날짜 단위로만 쓴다). 실패하면 빈 dict - 날짜만 못 붙을 뿐 나머지는
     그대로 나오게 한다."""
@@ -340,38 +343,84 @@ def fetch_versions_meta(project_id, api_key=None):
 
     return {
         v.get("id"): {
+            "name": v.get("name", ""),
             "due_date": v.get("due_date"),
             "created_on": (v.get("created_on") or "")[:10] or None,
+            "status": v.get("status", "open"),
         }
         for v in data.get("versions", [])
     }
 
 
-def fetch_version_due_dates(project_id, api_key=None):
-    """{버전id: 종료일("YYYY-MM-DD" 또는 None)} 를 돌려준다 - fetch_versions_meta에서
-    due_date만 뽑아 쓰는 얇은 래퍼(fetch_issues_by_version은 이것만 필요해서)."""
-    return {vid: meta["due_date"] for vid, meta in fetch_versions_meta(project_id, api_key).items()}
-
-
 def fetch_issues_by_version(project_id):
-    """레드마인 REST API로 특정 프로젝트에서 배포 버전(fixed_version)에 연결된 이슈를
-    가져와 버전별로 묶어 반환한다. 상태는 가리지 않고(status_id=*) 진행 중인 것까지 다
-    포함하며, 버전이 지정 안 된 이슈는 아예 제외한다("버전별 연결된 일감"이라는 화면
-    이름 그대로). 실패/미설정 시 빈 리스트를 반환.
+    """레드마인 REST API로 특정 프로젝트의 배포 버전(fixed_version)마다 연결된 이슈를
+    가져와 묶어 반환한다. 상태는 가리지 않고(status_id=*) 닫힌 이슈까지 다 포함한다.
+
+    버전 목록을 먼저 받고 버전마다 그 버전에 연결된 이슈를 따로 조회하는 방식이다.
+    예전엔 그 프로젝트의 "최근 갱신된 이슈 300건"만 훑어서 거기 걸린 버전만 화면에
+    보여줬는데, 완료(닫힘)된 버전은 이슈가 오래전에 멈춰 있어 그 300건 밖으로 밀려나
+    로드맵 자체가 통째로 안 보이는 문제가 있었다 - 버전을 기준으로 조회하면 이슈가
+    얼마나 오래됐든 다 잡힌다.
+    실패/미설정 시 빈 리스트를 반환.
     반환 형식: [{"version": str, "due_date": str|None,
                  "issues": [{"id":, "subject":, "url":, "status":, "closed":}, ...]}, ...]"""
     api_key = load_redmine_api_key()
     if not api_key:
         return []
 
+    versions_meta = fetch_versions_meta(project_id, api_key)
+    if not versions_meta:
+        return []
+
+    # 버전마다 순서대로 이슈를 조회하면 버전 개수만큼 시간이 곱해져 너무 느려진다
+    # (버전이 많은 프로젝트는 실제로 몇십 초씩 걸렸다) - 몇 개씩 동시에 물어서
+    # 기다리는 시간을 줄인다. 그렇다고 전부 한꺼번에 쏘면 레드마인 서버에 부담이라
+    # 동시 개수는 적당히 제한한다.
+    issues_by_id = {}
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futures = {
+            pool.submit(_fetch_version_issues, vid, project_id, api_key): vid
+            for vid in versions_meta
+        }
+        for future in as_completed(futures):
+            issues_by_id[futures[future]] = future.result()
+
+    result = []
+    for vid in sorted(versions_meta):
+        issues = issues_by_id.get(vid) or []
+        if not issues:
+            continue  # 이 프로젝트에 연결된 일감이 없는 버전은 이 화면 대상이 아니다
+        meta = versions_meta[vid]
+        result.append({
+            "version": meta.get("name", ""),
+            "due_date": meta.get("due_date"),
+            "issues": issues,
+        })
+    return result
+
+
+def _fetch_version_issues(version_id, project_id, api_key):
+    """버전 하나에 연결된 이슈 중 이 프로젝트 "자신" 소속인 것만 전부(닫힌 것 포함,
+    페이징 없이 끝까지) 가져온다.
+
+    project_id로 좁히는 이유: 공유 범위가 "모든 프로젝트"인 버전은 다른 프로젝트의
+    이슈도 같은 버전에 걸릴 수 있어서, project_id 없이 fixed_version_id만 물으면
+    그 버전을 실제로 만든/쓰는 다른 프로젝트의 이슈까지 섞여 들어온다.
+
+    subproject_id=!*를 붙이는 이유: 레드마인 REST API는 project_id만 주면 기본으로
+    "하위 프로젝트의 이슈까지" 같이 돌려준다. App._resolved_targets가 최상위를
+    고르면 하위 프로젝트를 이미 하나하나 따로 훑고 있어서, 여기서 하위까지 같이
+    받으면 그 이슈가 자기 프로젝트 몫과 조상 프로젝트 몫 양쪽에 중복으로 잡히고,
+    "어느 프로젝트 건지" 표시도 조상 이름으로 잘못 붙는다 - 그게 로드맵/프로젝트
+    표시가 뒤섞여 보이던 원인이었다."""
     issues = []
     offset = 0
     limit = 100
-    max_issues = 300
-    while offset < max_issues:
+    while True:
         url = (
             f"{REDMINE_BASE_URL}/issues.json"
-            f"?project_id={project_id}&status_id=*&sort=updated_on:desc&limit={limit}&offset={offset}"
+            f"?project_id={project_id}&subproject_id=!*&fixed_version_id={version_id}"
+            f"&status_id=*&sort=id:desc&limit={limit}&offset={offset}"
         )
         req = urllib.request.Request(url, headers={"X-Redmine-API-Key": api_key})
         try:
@@ -386,22 +435,8 @@ def fetch_issues_by_version(project_id):
         if not batch or offset >= data.get("total_count", 0):
             break
 
-    due_by_version_id = fetch_version_due_dates(project_id, api_key)
-
-    groups = {}
-    version_ids = {}  # 버전명 -> 버전id (종료일을 붙이는 데 쓴다)
-    order = []
-    for i in issues:
-        # fixed_version 키 자체가 없을 수도, 값이 null일 수도 있어서 양쪽 다 대비한다
-        version = i.get("fixed_version") or {}
-        version_name = version.get("name")
-        if not version_name:
-            continue  # 버전에 연결 안 된 일감은 이 화면 대상이 아니다
-        if version_name not in groups:
-            groups[version_name] = []
-            version_ids[version_name] = version.get("id")
-            order.append(version_name)
-        groups[version_name].append({
+    return [
+        {
             "id": i.get("id"),
             "subject": i.get("subject", ""),
             "url": f"{REDMINE_BASE_URL}/issues/{i.get('id')}",
@@ -409,15 +444,8 @@ def fetch_issues_by_version(project_id):
             # 상태 "이름"만으로는 끝난 일감인지 알 수 없다(레드마인마다 완료 상태
             # 이름이 다름) - closed_on이 찍혔는지로 판단해서 버전 진행률을 센다.
             "closed": bool(i.get("closed_on")),
-        })
-
-    return [
-        {
-            "version": version_name,
-            "due_date": due_by_version_id.get(version_ids[version_name]),
-            "issues": groups[version_name],
         }
-        for version_name in order
+        for i in issues
     ]
 
 
@@ -495,6 +523,90 @@ def _fetch_version_progress(project_id, api_key):
             "url": f"{REDMINE_BASE_URL}/versions/{vid}",
         })
     return result
+
+
+def fetch_calendar_versions(pairs):
+    """배포 달력 화면이 쓴다. (project_id, project_name, source) 목록을 받아
+    프로젝트마다 버전 목록을 조회해 종료일이 잡힌 것만 종료일 오름차순 평면
+    목록으로 돌려준다(종료일 없는 버전은 달력에 찍을 자리가 없어 아예 뺀다).
+    조회에 실패한 프로젝트는 조용히 건너뛴다 - 달력은 일부만이라도 보이는 게
+    통째로 비는 것보다 낫다.
+    반환 형식: [{"version_id":, "version":, "project":, "project_id":, "source":,
+                 "due_date":, "status": "open"/"locked"/"closed", "url":}, ...]"""
+    rows = []
+    for project_id, project_name, source in pairs:
+        base_url, api_key = redmine_server(source)
+        if not api_key:
+            continue
+
+        url = f"{base_url}/projects/{project_id}/versions.json"
+        req = urllib.request.Request(url, headers={"X-Redmine-API-Key": api_key})
+        try:
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.load(resp)
+        except (urllib.error.URLError, OSError, ValueError):
+            continue
+
+        for v in data.get("versions", []):
+            # /projects/:id/versions.json은 이 프로젝트가 만든 버전뿐 아니라, 공유
+            # 범위(sharing)가 "모든 프로젝트"인 다른 프로젝트의 버전까지 같이 돌려준다.
+            # 그대로 쓰면 즐겨찾기한 프로젝트마다 같은 버전이 중복으로(그것도 엉뚱한
+            # project_name을 달고) 찍히니, 실제로 그 버전을 만든 프로젝트일 때만 담는다.
+            owner_id = (v.get("project") or {}).get("id")
+            if owner_id is not None and owner_id != project_id:
+                continue
+            due_date = v.get("due_date")
+            if not due_date:
+                continue
+            rows.append({
+                "version_id": v.get("id"),
+                "version": v.get("name", ""),
+                "project": project_name,
+                "project_id": project_id,
+                "source": source,
+                "due_date": due_date,
+                "status": v.get("status", "open"),
+                "url": f"{base_url}/versions/{v.get('id')}",
+            })
+
+    rows.sort(key=lambda r: (r["due_date"], r["project"], r["version"]))
+    return rows
+
+
+def fetch_version_issue_counts(version_id, source="company"):
+    """배포 달력에서 날짜를 눌렀을 때 그 날 나가는 버전에 연결된 일감 진행률을
+    센다. 반환 형식: {"total":, "closed":}. 실패하면 None을 반환한다(빈 결과와
+    구분해 화면이 진행률 자리만 빼고 나머지는 그대로 보여주게 한다)."""
+    base_url, api_key = redmine_server(source)
+    if not api_key:
+        return None
+
+    issues = []
+    total_count = 0
+    offset = 0
+    limit = 100
+    max_issues = 300
+    while offset < max_issues:
+        url = (
+            f"{base_url}/issues.json"
+            f"?fixed_version_id={version_id}&status_id=*&limit={limit}&offset={offset}"
+        )
+        req = urllib.request.Request(url, headers={"X-Redmine-API-Key": api_key})
+        try:
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.load(resp)
+        except (urllib.error.URLError, OSError, ValueError):
+            return None
+
+        batch = data.get("issues", [])
+        issues.extend(batch)
+        total_count = data.get("total_count", len(issues))
+        offset += limit
+        if not batch or offset >= total_count:
+            break
+
+    closed = sum(1 for i in issues if i.get("closed_on"))
+    return {"total": total_count, "closed": closed}
 
 
 def search_query_words(query):
@@ -604,3 +716,41 @@ def load_seen_issues():
 def save_seen_issues(seen_issue_ids):
     with open(SEEN_ISSUES_FILE, "w", encoding="utf-8") as f:
         json.dump(seen_issue_ids, f, ensure_ascii=False, indent=2)
+
+
+def _load_json_cache(path):
+    if not path.exists():
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save_json_cache(path, cache):
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
+    except OSError:
+        pass  # 캐시 저장 실패로 화면이 멈출 이유는 없다 - 이번 회차만 캐시 없이 다시 받는다
+
+
+def load_resolved_by_version_cache():
+    """{프로젝트id(str): fetch_issues_by_version 반환값} - "버전별 연결된 일감" 패널이
+    프로젝트를 고를 때마다 레드마인 응답을 기다리지 않고 지난 결과부터 보여주는 데 쓴다."""
+    return _load_json_cache(RESOLVED_BY_VERSION_CACHE_FILE)
+
+
+def save_resolved_by_version_cache(cache):
+    _save_json_cache(RESOLVED_BY_VERSION_CACHE_FILE, cache)
+
+
+def load_team_progress_cache():
+    """{프로젝트id(str): get_team_progress 반환값} - "팀별 진행상황" 패널이 조직/팀을
+    고를 때마다 레드마인 응답을 기다리지 않고 지난 결과부터 보여주는 데 쓴다."""
+    return _load_json_cache(TEAM_PROGRESS_CACHE_FILE)
+
+
+def save_team_progress_cache(cache):
+    _save_json_cache(TEAM_PROGRESS_CACHE_FILE, cache)

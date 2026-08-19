@@ -29,5 +29,113 @@
     "name": "재난망",
     "url": "http://10.1.100.20/projects/vm65ps/issues",
     "source": "team"
+  },
+  {
+    "id": 170,
+    "name": "LM75 재난망 (A, D) ",
+    "url": "http://10.1.100.150/redmine/projects/lm75-a-d/issues",
+    "source": "company"
+  },
+  {
+    "id": 143,
+    "name": "Vodafone Qatar",
+    "url": "http://10.1.100.150/redmine/projects/vodafone-qatar/issues",
+    "source": "company"
+  },
+  {
+    "id": 127,
+    "name": "SIRDEE",
+    "url": "http://10.1.100.150/redmine/projects/sirdee/issues",
+    "source": "company"
+  },
+  {
+    "id": 229,
+    "name": "Tel Aviv Metro",
+    "url": "http://10.1.100.150/redmine/projects/tel-aviv-metro/issues",
+    "source": "company"
+  },
+  {
+    "id": 114,
+    "name": "Polkomtel",
+    "url": "http://10.1.100.150/redmine/projects/polkomtel/issues",
+    "source": "company"
+  },
+  {
+    "id": 38,
+    "name": "PTA",
+    "url": "http://10.1.100.150/redmine/projects/out_aut_pta/issues",
+    "source": "company"
+  },
+  {
+    "id": 119,
+    "name": "PGE_LM75C",
+    "url": "http://10.1.100.150/redmine/projects/pge_lm75c/issues",
+    "source": "company"
+  },
+  {
+    "id": 28,
+    "name": "Nokia GC",
+    "url": "http://10.1.100.150/redmine/projects/out_nokia_gc/issues",
+    "source": "company"
+  },
+  {
+    "id": 17,
+    "name": "450 Connect",
+    "url": "http://10.1.100.150/redmine/projects/out_ger_450_connect/issues",
+    "source": "company"
+  },
+  {
+    "id": 121,
+    "name": "CTB 공통 패키지",
+    "url": "http://10.1.100.150/redmine/projects/northcom/issues",
+    "source": "company"
+  },
+  {
+    "id": 279,
+    "name": "DAMM TETRA 연동",
+    "url": "http://10.1.100.150/redmine/projects/damm-tetra/issues",
+    "source": "company"
+  },
+  {
+    "id": 164,
+    "name": "DSTA",
+    "url": "http://10.1.100.150/redmine/projects/out_sin_dsta/issues",
+    "source": "company"
+  },
+  {
+    "id": 111,
+    "name": "Erillisverkot_LM75B",
+    "url": "http://10.1.100.150/redmine/projects/erillisverkot_lm75b/issues",
+    "source": "company"
+  },
+  {
+    "id": 231,
+    "name": "J-NET (예루살렘 지하철)",
+    "url": "http://10.1.100.150/redmine/projects/j-net/issues",
+    "source": "company"
+  },
+  {
+    "id": 259,
+    "name": "LM84 Project",
+    "url": "http://10.1.100.150/redmine/projects/erillisverkot_lm84b/issues",
+    "source": "company"
+  },
+  {
+    "id": 26,
+    "name": "MOI",
+    "url": "http://10.1.100.150/redmine/projects/out_qat_moi/issues",
+    "source": "company"
+  },
+  {
+    "id": 35,
+    "name": "NCRTC Railway",
+    "url": "http://10.1.100.150/redmine/projects/out_ind_ntrtc/issues",
+    "source": "company"
+  },
+  {
+    "id": 260,
+    "name": "NORTHCOM DK",
+    "url": "http://10.1.100.150/redmine/projects/northcom-dk/issues",
+    "source": "company"
   }
 ]

@@ -86,20 +86,39 @@ html, body {
     background: #DBE2ED;
 }
 
-/* "지연" / "다가오는 배포" 같은 소구분 - 팀별 진행상황의 subgroup-heading과 같은 톤 */
-.group-heading {
-    display: inline-block;
-    color: #5A6B85;
-    font-size: 10.5px;
-    font-weight: 700;
-    padding: 2px 9px;
-    margin: 10px 0 6px 10px;
-    border-radius: 9px;
-    background: #FFFFFF;
+/* "다가오는 일정" / "지연" 탭 - 지연 건이 있어도 목록 맨 위를 차지하지 않고,
+   눌러야 보이게 한다(calendar_panel.js의 leftTab 기본값 참고). */
+.left-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 2px 0 10px 2px;
 }
 
-.group-heading.late {
+.left-tab {
+    flex: 1;
+    border: 1px solid #CED4DA;
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: #5A6B85;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: inherit;
+    padding: 7px 4px;
+    cursor: pointer;
+}
+
+.left-tab:hover {
+    background: #DBE2ED;
+}
+
+.left-tab.active {
+    border-color: #152340;
+    background: #152340;
     color: #FFFFFF;
+}
+
+.left-tab.late.active {
+    border-color: var(--state-late);
     background: var(--state-late);
 }
 

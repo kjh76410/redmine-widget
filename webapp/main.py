@@ -16,6 +16,7 @@ import sys
 import threading
 import time
 import webbrowser
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import webview
@@ -418,6 +419,13 @@ class App:
         # 종료일 잡힌 버전이 없음"이라, 화면이 "불러오는 중"과 "없음"을 구분할 수 있어야
         # 해서 굳이 나눠 둔다(_render_calendar 참고).
         self.calendar_versions = None
+        # {프로젝트id(str): 그 프로젝트를 마지막으로 골랐을 때 받아온 결과} - 디스크에
+        # 저장돼 있어 앱을 다시 켜도 남아있다. 패널을 열 때마다 레드마인 응답을 기다리지
+        # 않고 이 캐시부터 보여준 뒤, 뒤에서 새로 받아와 갱신한다(get_resolved_by_version/
+        # get_team_progress 참고) - 레드마인 이슈 페이징 조회가 한 프로젝트만 골라도
+        # 몇 초씩 걸려서, 클릭할 때마다 매번 기다리게 하면 너무 느리다.
+        self.resolved_by_version_cache = redmine_api.load_resolved_by_version_cache()
+        self.team_progress_cache = redmine_api.load_team_progress_cache()
 
         self.user_id_dialog = None
         self._pending_my_issues_open = False  # 아이디 설정 후 "할당된 일감"을 이어서 열지 여부
@@ -981,7 +989,93 @@ class App:
         self.panel.evaluate_js(f"renderResolvedPanel({data})")
 
     def get_resolved_by_version(self, project_id):
-        return redmine_api.fetch_issues_by_version(project_id)
+        """최상위(하위 프로젝트가 있는) 프로젝트를 고르면 그 자신뿐 아니라 하위
+        프로젝트에 걸린 로드맵/일감까지 다 모아서 보여준다 - 실제 배포 버전은 하위
+        프로젝트 쪽에 달려 있는 경우가 많아서, 최상위 하나만 보면 화면이 텅 비어
+        보인다(_resolved_targets 참고). 하위가 둘 이상 섞이면 버전 이름이 겹칠 수
+        있어 각 항목에 project 필드를 붙인다(_fetch_resolved_by_version).
+
+        캐시(self.resolved_by_version_cache)에 이 프로젝트(선택한 노드 기준) 결과가
+        있으면 레드마인을 새로 묻지 않고 바로 돌려주고, 최신 데이터는 뒤에서 조용히
+        받아와 갱신한다(_refresh_resolved_by_version 참고) - 없으면(처음 고르는
+        프로젝트) 이번 한 번만 기다린다. 레드마인 이슈 페이징 조회가 프로젝트 하나만
+        골라도 몇 초씩 걸려서, 클릭할 때마다 매번 기다리게 하면 너무 느리다."""
+        project_id = int(project_id)
+        targets = self._resolved_targets(project_id)
+        if not targets:
+            return []
+
+        cache_key = str(project_id)
+        cached = self.resolved_by_version_cache.get(cache_key)
+        if cached is not None:
+            threading.Thread(
+                target=self._refresh_resolved_by_version, args=(project_id, targets), daemon=True,
+            ).start()
+            return cached
+
+        result = self._fetch_resolved_by_version(targets)
+        self.resolved_by_version_cache[cache_key] = result
+        redmine_api.save_resolved_by_version_cache(self.resolved_by_version_cache)
+        return result
+
+    def _resolved_targets(self, project_id):
+        """project_id 노드를 트리에서 찾아 자기 자신 + 모든 하위 프로젝트를
+        [(id, name), ...]로 평평하게 돌려준다(고른 게 최상위면 하위 전부, 이미 말단
+        이면 자기 자신 하나). 트리에 없는 id면 []."""
+        def find(nodes):
+            for n in nodes:
+                if n["id"] == project_id:
+                    return n
+                found = find(n.get("children") or [])
+                if found is not None:
+                    return found
+            return None
+
+        node = find(self.company_tree)
+        if node is None:
+            return []
+
+        targets = []
+
+        def collect(n):
+            targets.append((n["id"], n["name"]))
+            for c in n.get("children") or []:
+                collect(c)
+
+        collect(node)
+        return targets
+
+    def _fetch_resolved_by_version(self, targets):
+        multiple = len(targets) > 1
+        if not multiple:
+            pid, _name = targets[0]
+            return redmine_api.fetch_issues_by_version(pid)
+
+        # 최상위를 골라 하위 프로젝트를 다 훑을 때, 순서대로 하나씩 물으면 프로젝트
+        # 개수만큼 시간이 곱해져 너무 느려진다(하위가 수십 개면 몇십 초씩 걸렸다) -
+        # 몇 개씩 동시에 물어서 기다리는 시간을 줄인다.
+        result = []
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futures = {
+                pool.submit(redmine_api.fetch_issues_by_version, pid): name
+                for pid, name in targets
+            }
+            for future in as_completed(futures):
+                name = futures[future]
+                for g in future.result():
+                    result.append({**g, "project": name})
+        return result
+
+    def _refresh_resolved_by_version(self, project_id, targets):
+        """get_resolved_by_version이 캐시를 먼저 돌려준 뒤 백그라운드에서 부르는 함수.
+        새로 받아온 결과로 캐시를 갱신하고, 그 사이 다른 프로젝트로 안 넘어갔으면
+        (패널이 여전히 열려 있고 버전별 연결된 일감 화면이면) 화면도 최신으로 다시 그린다."""
+        result = self._fetch_resolved_by_version(targets)
+        self.resolved_by_version_cache[str(project_id)] = result
+        redmine_api.save_resolved_by_version_cache(self.resolved_by_version_cache)
+        if self.panel is not None and self.panel_kind == "resolved_by_version":
+            data = json.dumps(result, ensure_ascii=False)
+            self.panel.evaluate_js(f"updateVersionGroups({project_id}, {data})")
 
     def _push_team_progress_tree(self):
         if self.panel is None:
@@ -1005,24 +1099,47 @@ class App:
         반환 형식: [{"team": str, "team_id": int,
                      "subgroups": [{"team": str, "team_id": int, "versions": [...]}, ...]},
                     ...]
-        (subgroups 안의 "versions"는 fetch_team_progress 반환값과 동일)"""
+        (subgroups 안의 "versions"는 fetch_team_progress 반환값과 동일)
+
+        캐시(self.team_progress_cache)에 이 프로젝트 결과가 있으면 레드마인을 새로
+        묻지 않고 그걸 바로 돌려주고, 최신 데이터는 뒤에서 조용히 받아와 갱신한다
+        (_refresh_team_progress 참고) - 없으면(처음 고르는 프로젝트) 이번 한 번만
+        기다린다."""
         project_id = int(project_id)
+        team_nodes = self._team_progress_nodes(project_id)
+        if team_nodes is None:
+            return []
+
+        cache_key = str(project_id)
+        cached = self.team_progress_cache.get(cache_key)
+        if cached is not None:
+            threading.Thread(
+                target=self._refresh_team_progress, args=(project_id, team_nodes), daemon=True,
+            ).start()
+            return cached
+
+        result = self._fetch_team_progress(team_nodes)
+        self.team_progress_cache[cache_key] = result
+        redmine_api.save_team_progress_cache(self.team_progress_cache)
+        return result
+
+    def _team_progress_nodes(self, project_id):
+        """project_id로 고른 노드가 최상위(루트)면 그 depth 1 자식들을, 팀 자신(depth 1)
+        이면 그 하나만 담은 리스트를 돌려준다(get_team_progress 설명 참고). 트리에
+        없는 id면 None."""
         root = next((n for n in self.company_tree if n["id"] == project_id), None)
         if root is not None:
-            team_nodes = root.get("children") or [root]
-        else:
-            team_nodes = None
-            for r in self.company_tree:
-                child = next((c for c in r.get("children", []) if c["id"] == project_id), None)
-                if child is not None:
-                    team_nodes = [child]
-                    break
-            if team_nodes is None:
-                return []
+            return root.get("children") or [root]
+        for r in self.company_tree:
+            child = next((c for c in r.get("children", []) if c["id"] == project_id), None)
+            if child is not None:
+                return [child]
+        return None
 
+    def _fetch_team_progress(self, team_nodes):
         # 팀(depth 1)마다 순서대로 조회하면 팀 개수만큼 시간이 곱해져 너무 느려지므로,
-        # 모든 팀의 depth 2 자식을 한 평평한 목록으로 모아 한 번에 병렬 조회한 뒤
-        # 팀별로 다시 묶는다.
+        # 모든 팀의 depth 2 자식을 한 평평한 목록으로 모아 한 번에 조회한 뒤 팀별로
+        # 다시 묶는다.
         flat = []  # [(project_id, name, team_index), ...]
         for team_index, team_node in enumerate(team_nodes):
             sub_children = team_node.get("children") or [team_node]
@@ -1035,6 +1152,17 @@ class App:
         for (_pid, _name, team_index), r in zip(flat, flat_results):
             result[team_index]["subgroups"].append(r)
         return result
+
+    def _refresh_team_progress(self, project_id, team_nodes):
+        """get_team_progress가 캐시를 먼저 돌려준 뒤 백그라운드에서 부르는 함수.
+        새로 받아온 결과로 캐시를 갱신하고, 그 사이 다른 조직/팀으로 안 넘어갔으면
+        (패널이 여전히 열려 있고 팀별 진행상황 화면이면) 화면도 최신으로 다시 그린다."""
+        result = self._fetch_team_progress(team_nodes)
+        self.team_progress_cache[str(project_id)] = result
+        redmine_api.save_team_progress_cache(self.team_progress_cache)
+        if self.panel is not None and self.panel_kind == "team_progress":
+            data = json.dumps(result, ensure_ascii=False)
+            self.panel.evaluate_js(f"updateOrgCol({project_id}, {data})")
 
     # ── 배포 달력 ─────────────────────────────────
     # 즐겨찾기한 프로젝트의 배포 버전(종료일이 잡힌 것)을 달마다 점으로 찍어 보여주는
@@ -1057,10 +1185,25 @@ class App:
         if self.panel_kind == "deploy_calendar":
             self._render_calendar()
 
+    def _calendar_years(self):
+        """공휴일을 뽑을 연도 목록. 버전 종료일이 걸린 연도들과 오늘 연도를 합치고,
+        달만 넘겨도(예: 12월->1월) 빈 연도가 안 나오게 앞뒤 1년을 여유로 더한다."""
+        years = {time.localtime().tm_year}
+        for v in self.calendar_versions or []:
+            due_date = v.get("due_date")
+            if due_date:
+                years.add(int(due_date[:4]))
+        years.update({min(years) - 1, max(years) + 1})
+        return years
+
     def _render_calendar(self):
         if self.panel is None:
             return
         versions = self.calendar_versions
+        holidays = {}
+        for year in self._calendar_years():
+            for day, name in korean_holidays.get_holidays(year).items():
+                holidays[day.isoformat()] = name
         data = json.dumps(
             {
                 "versions": versions or [],
@@ -1072,7 +1215,7 @@ class App:
                 # 달력은 달을 넘길 때 서버에 다시 묻지 않으므로(전부 클라이언트에서
                 # 그린다) 공휴일도 창을 열 때 아는 연도치를 통째로 넘겨둔다.
                 # 수백 건이 아니라 수십 건이라 payload에 부담이 없다.
-                "holidays": korean_holidays.holidays_between(*korean_holidays.known_years()),
+                "holidays": holidays,
             },
             ensure_ascii=False,
         )

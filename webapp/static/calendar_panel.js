@@ -30,6 +30,7 @@ let viewYear = null;        // 지금 보고 있는 달 (month는 자바스크�
 let viewMonth = null;
 let selectedDate = null;    // 왼쪽에 상세를 펼쳐 놓은 날짜, 없으면 null
 let progressToken = 0;      // 진행률을 비동기로 채우는 중에 다른 날짜로 넘어가면 버리려고
+let leftTab = "upcoming";   // "upcoming" | "late" - 패널을 열 때마다 항상 다가오는 일정부터 보여준다
 
 function renderCalendarPanel(data) {
     versions = data.versions || [];
@@ -221,9 +222,8 @@ function renderLeft() {
         return;
     }
 
-    col.appendChild(heading("다가오는 일정"));
-
     if (versions.length === 0) {
+        col.appendChild(heading("다가오는 일정"));
         col.appendChild(placeholder(emptyMessage()));
         return;
     }
@@ -241,27 +241,52 @@ function renderLeft() {
         (v) => dayDiff(today, v.due_date) > UPCOMING_DAYS
     ).length;
 
-    if (late.length > 0) {
-        col.appendChild(groupHeading(`지연 ${late.length}건`, true));
-        late.forEach((v) => col.appendChild(renderUpcomingItem(v)));
+    col.appendChild(renderLeftTabs(upcoming.length, late.length));
+
+    if (leftTab === "late") {
+        if (late.length === 0) {
+            col.appendChild(placeholder("지연된 배포가 없습니다."));
+        } else {
+            late.forEach((v) => col.appendChild(renderUpcomingItem(v)));
+        }
+        return;
     }
 
-    if (upcoming.length > 0) {
-        col.appendChild(groupHeading(`앞으로 ${UPCOMING_DAYS}일 ${upcoming.length}건`));
-        upcoming.forEach((v) => col.appendChild(renderUpcomingItem(v)));
-    }
-
-    if (late.length === 0 && upcoming.length === 0) {
+    if (upcoming.length === 0) {
         col.appendChild(placeholder(
             laterCount > 0
                 ? `앞으로 ${UPCOMING_DAYS}일 안에 예정된 배포가 없습니다.`
                 : "예정된 배포가 없습니다."
         ));
+    } else {
+        upcoming.forEach((v) => col.appendChild(renderUpcomingItem(v)));
     }
 
     if (laterCount > 0) {
         col.appendChild(placeholder(`그 이후 ${laterCount}건은 달력에서 확인하세요.`));
     }
+}
+
+// 위쪽 두 탭. 지연 건이 있어도 목록 맨 위를 차지하지 않도록, 패널을 열면 항상
+// "다가오는 일정" 탭이 먼저 보인다(leftTab 초기값 참고) - 지연은 눌러야 보인다.
+function renderLeftTabs(upcomingCount, lateCount) {
+    const wrap = document.createElement("div");
+    wrap.className = "left-tabs";
+    wrap.appendChild(leftTabButton("upcoming", `다가오는 일정 ${upcomingCount}`, false));
+    wrap.appendChild(leftTabButton("late", `지연 ${lateCount}`, true));
+    return wrap;
+}
+
+function leftTabButton(tab, text, isLate) {
+    const btn = document.createElement("button");
+    btn.className = "left-tab" + (isLate ? " late" : "") + (leftTab === tab ? " active" : "");
+    btn.textContent = text;
+    btn.addEventListener("click", () => {
+        if (leftTab === tab) return;
+        leftTab = tab;
+        renderLeft();
+    });
+    return btn;
 }
 
 // 즐겨찾기가 아예 없는 것과, 즐겨찾기는 했는데 종료일 잡힌 버전이 없는 것은
@@ -457,13 +482,6 @@ function heading(text) {
     const span = document.createElement("span");
     span.textContent = text;
     el.appendChild(span);
-    return el;
-}
-
-function groupHeading(text, isLate) {
-    const el = document.createElement("div");
-    el.className = "group-heading" + (isLate ? " late" : "");
-    el.textContent = text;
     return el;
 }
 

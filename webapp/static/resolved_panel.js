@@ -1,11 +1,19 @@
 // 파이썬(App._push_resolved_tree)이 호출하는 진입점: {tree} 형태의 데이터를 받는다.
 // tree는 전사 레드마인 프로젝트 트리(회사 것만 - 원래 Tkinter 버전과 동일한 범위).
 let selectedProjectRow = null;
+let selectedProjectId = null;  // 지금 오른쪽에 펼쳐놓은 프로젝트의 id - updateVersionGroups가
+                                // 그 사이 다른 걸 골랐으면(불일치) 백그라운드 새로고침 결과를 버리는 데 쓴다
 let selectedVersionRow = null;
 let selectedVersionGroup = null;
 let versionGroups = [];
 let yearFilter = null;  // null=전체, 그 외엔 연도(숫자) 또는 "none"(종료일 없는 버전)
 let loadToken = 0;
+
+// 프로젝트를 고를 때마다 연도 필터 기본값 - "지금 당장 뭐가 나가는지"가 제일 궁금한
+// 화면이라, 처음엔 항상 올해 배지가 눌린 상태로 시작한다(전체를 보려면 눌러서 끄면 됨).
+function currentYear() {
+    return new Date().getFullYear();
+}
 
 // 상태 뱃지 색 - 일감 창의 유형/우선순위 뱃지와 같은 팔레트("연한 배경 + 진한 글자").
 // 레드마인마다 상태 이름이 달라서 여기 없는 이름은 STATUS_FALLBACK으로 떨어진다.
@@ -28,12 +36,12 @@ function renderResolvedPanel(data) {
     const col = document.getElementById("colProject");
     col.innerHTML = "";
     selectedProjectRow = null;
+    selectedProjectId = null;
     selectedVersionRow = null;
     selectedVersionGroup = null;
     versionGroups = [];
     yearFilter = null;
     document.getElementById("badgeVersion").innerHTML = "";
-    document.getElementById("badgeIssue").innerHTML = "";
     renderPlaceholder("colVersion", "왼쪽에서 프로젝트를 선택하세요.");
     renderPlaceholder("colIssue", "프로젝트와 버전을 선택하세요.");
 
@@ -97,13 +105,13 @@ function selectProject(node, row) {
     if (selectedProjectRow) selectedProjectRow.classList.remove("selected");
     row.classList.add("selected");
     selectedProjectRow = row;
+    selectedProjectId = node.id;
 
     selectedVersionRow = null;
     selectedVersionGroup = null;
     versionGroups = [];
-    yearFilter = null;
+    yearFilter = currentYear();
     document.getElementById("badgeVersion").innerHTML = "";
-    document.getElementById("badgeIssue").innerHTML = "";
     renderPlaceholder("colVersion", "불러오는 중...");
     renderPlaceholder("colIssue", "프로젝트와 버전을 선택하세요.");
 
@@ -116,6 +124,26 @@ function selectProject(node, row) {
         if (token !== loadToken) return;
         renderPlaceholder("colVersion", "불러오기 실패: " + String(err));
     });
+}
+
+// 파이썬(App._refresh_resolved_by_version)이 캐시를 먼저 보여준 뒤 백그라운드로 새로
+// 받아온 최신 데이터를 밀어줄 때 부르는 진입점. 그 사이 다른 프로젝트를 골랐으면 조용히
+// 버린다. 버전을 하나 펼쳐 보고 있었으면(selectedVersionGroup) 새 목록에서 같은 버전을
+// 이름으로 다시 찾아 선택/일감 칸도 그대로 이어간다 - 새로 받아온 객체는 참조가 달라져서
+// 그냥 두면 renderVersionRow의 참조 비교(group === selectedVersionGroup)가 깨진다.
+function updateVersionGroups(projectId, groups) {
+    if (projectId !== selectedProjectId) return;
+    const selectedVersionName = selectedVersionGroup ? selectedVersionGroup.version : null;
+    versionGroups = groups || [];
+    selectedVersionGroup = selectedVersionName
+        ? versionGroups.find((g) => g.version === selectedVersionName) || null
+        : null;
+    renderVersionCol();
+    if (selectedVersionGroup) {
+        renderIssueCol(selectedVersionGroup);
+    } else if (selectedVersionName) {
+        renderPlaceholder("colIssue", "프로젝트와 버전을 선택하세요.");
+    }
 }
 
 // 버전의 종료일 연도(없으면 "none") - 배지 묶음을 만들 때와 필터링할 때 같은 기준으로 쓴다.
@@ -138,7 +166,52 @@ function renderVersionCol() {
     const groups = versionGroups
         .filter((g) => yearFilter === null || versionYearKey(g) === yearFilter)
         .sort((a, b) => (a.due_date || "") > (b.due_date || "") ? -1 : (a.due_date || "") < (b.due_date || "") ? 1 : 0);
-    groups.forEach((group) => col.appendChild(renderVersionRow(group)));
+
+    // 기본값이 "올해"로 걸려 있는 경우가 많아서(currentYear 참고), 정작 그 프로젝트에
+    // 올해 버전이 없으면 목록이 빈 채로 아무 설명도 없이 비어 보인다 - 실제로는 필터
+    // 때문이라고 알려준다(위 "해결된 이슈가 없습니다"는 필터와 무관하게 버전 자체가
+    // 하나도 없을 때만 쓴다).
+    if (groups.length === 0) {
+        const label = yearFilter === "none" ? "종료일 미정" : `${yearFilter}년`;
+        renderPlaceholder("colVersion", `${label} 버전이 없습니다.`);
+        return;
+    }
+
+    // 최상위를 골라 하위 프로젝트를 모아 보여줄 때만(project 필드가 붙어 있을 때만)
+    // 하위 프로젝트별로 섹션을 나눈다 - 단일 프로젝트를 골랐을 땐 project 필드 자체가
+    // 없으니(App._fetch_resolved_by_version 참고) 예전처럼 그냥 평평한 목록 그대로.
+    if (groups.some((g) => g.project)) {
+        renderVersionsGroupedByProject(col, groups);
+    } else {
+        groups.forEach((group) => col.appendChild(renderVersionRow(group)));
+    }
+}
+
+// 하위 프로젝트마다 섹션을 나눠서 그 프로젝트의 버전들을 묶어 보여준다(각 섹션 안
+// 순서는 위에서 이미 정렬해 둔 종료일 내림차순 그대로). 섹션 순서는 프로젝트 이름
+// 가나다순 - 여러 프로젝트를 한꺼번에 조회하는 순서(스레드가 끝나는 순서)는 매번
+// 달라져서, 이름순으로 고정해야 다시 그릴 때마다(연도 필터를 바꿀 때 등) 섹션
+// 위치가 안 흔들린다.
+function renderVersionsGroupedByProject(col, groups) {
+    const byProject = new Map();
+    groups.forEach((g) => {
+        const key = g.project || "";
+        if (!byProject.has(key)) byProject.set(key, []);
+        byProject.get(key).push(g);
+    });
+
+    [...byProject.keys()].sort((a, b) => a.localeCompare(b, "ko")).forEach((project, i) => {
+        const section = document.createElement("div");
+        section.className = "project-section" + (i > 0 ? " with-divider" : "");
+
+        const heading = document.createElement("div");
+        heading.className = "project-heading";
+        heading.textContent = project;
+        section.appendChild(heading);
+
+        byProject.get(project).forEach((group) => section.appendChild(renderVersionRow(group)));
+        col.appendChild(section);
+    });
 }
 
 // 로드맵 칸의 연도 배지 - #badgeVersion(#badgeRow 안, 일감 칸 배지와 구분선 없이
@@ -221,7 +294,6 @@ function formatDue(dueDate) {
 function renderIssueCol(group) {
     const col = document.getElementById("colIssue");
     col.innerHTML = "";
-    renderIssueBadge(group);
 
     const issues = group.issues;
     if (!issues || issues.length === 0) {
@@ -257,17 +329,3 @@ function renderIssueCol(group) {
     });
 }
 
-// 일감 칸 배지 - #badgeIssue(#badgeRow 안, 로드맵 칸 배지 바로 옆에 구분선 없이
-// 이어지는 자리)에 그린다. 지금 보고 있는 게 어느 연도 버전인지(로드맵 칸에서
-// 넘어오며 종료일 문맥이 끊기니) 알려준다. 로드맵 칸의 배지와 달리 눌러도 아무
-// 일 없다(.year-badge.static - resolved_panel.css 참고) - 버전 하나를 골라 이미
-// 들어온 화면이라 여기서 더 거를 대상이 없다.
-function renderIssueBadge(group) {
-    const bar = document.getElementById("badgeIssue");
-    bar.innerHTML = "";
-    const year = versionYearKey(group);
-    const badge = document.createElement("span");
-    badge.className = "year-badge static";
-    badge.textContent = year === "none" ? "미정" : `${year}`;
-    bar.appendChild(badge);
-}
