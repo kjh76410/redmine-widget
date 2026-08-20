@@ -5,6 +5,7 @@
 
 import json
 import re
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -12,7 +13,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from config import (
     CALENDAR_CACHE_FILE,
+    FAVORITE_ISSUES_CACHE_FILE,
     FAVORITES_FILE,
+    MY_ISSUES_CACHE_FILE,
+    PROJECTS_CACHE_FILE,
     REDMINE_API_KEY_FILE,
     REDMINE_API_KEY_PLACEHOLDER,
     REDMINE_BASE_URL,
@@ -762,3 +766,80 @@ def save_calendar_cache(versions):
             json.dump(versions, f, ensure_ascii=False, indent=2)
     except OSError:
         pass
+
+
+def load_my_issues_cache():
+    """"할당된 일감"이 마지막으로 받아온 목록(fetch_my_issues 반환값과 같은 모양).
+    달력과 달리 "아직 못 받아옴"과 "없음"을 화면에서 구분하지 않으므로(빈 목록이면
+    그냥 비어 보인다) 파일이 없으면 빈 리스트를 돌려준다."""
+    if not MY_ISSUES_CACHE_FILE.exists():
+        return []
+    try:
+        with open(MY_ISSUES_CACHE_FILE, "r", encoding="utf-8") as f:
+            cached = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+    return cached if isinstance(cached, list) else []
+
+
+def save_my_issues_cache(issues):
+    try:
+        with open(MY_ISSUES_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(issues, f, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
+
+
+def load_favorite_issues_cache():
+    """즐겨찾기 프로젝트별 이슈 목록/전체 개수를 (issues, totals) 튜플로 돌려준다.
+    둘 다 f"{source}:{id}" 키를 쓰는 dict다(main.py App.favorite_issues /
+    favorite_issue_totals 와 같은 모양). 개수는 목록보다 클 수 있어서(처음엔 최근
+    200건만 받는다) 같이 저장해야 "더 보기"가 캐시만으로도 제대로 뜬다."""
+    cache = _load_json_cache(FAVORITE_ISSUES_CACHE_FILE)
+    issues = cache.get("issues")
+    totals = cache.get("totals")
+    return (
+        issues if isinstance(issues, dict) else {},
+        totals if isinstance(totals, dict) else {},
+    )
+
+
+# 즐겨찾기 이슈 캐시도 여러 스레드가 같이 쓴다 - 배경 조회(refresh_favorite_issues의
+# worker)와 화면에서 부르는 "더 보기"/즐겨찾기 해제가 겹칠 수 있어, 쓰다 만 파일이
+# 남지 않게 잠금을 건다.
+_favorite_issues_cache_lock = threading.Lock()
+
+
+def save_favorite_issues_cache(issues, totals):
+    with _favorite_issues_cache_lock:
+        _save_json_cache(FAVORITE_ISSUES_CACHE_FILE, {"issues": issues, "totals": totals})
+
+
+# 전사/팀 프로젝트 목록은 서로 다른 스레드가 각자 받아와 같은 파일에 쓴다
+# (main.py App.refresh_trees의 worker_company / worker_team) - 한쪽이 읽고 쓰는
+# 사이에 다른 쪽이 끼어들면 먼저 쓴 결과가 통째로 날아가므로 잠금을 건다.
+_projects_cache_lock = threading.Lock()
+
+
+def load_projects_cache():
+    """{"company": [평면 프로젝트 리스트], "team": [...]} - 트리로 묶기 전 모양
+    그대로 저장해 둔다(build_project_tree가 children을 붙이면서 같은 dict를 다시
+    쓰기 때문에, 트리째 저장하면 같은 프로젝트가 중첩돼 파일이 커진다)."""
+    cache = _load_json_cache(PROJECTS_CACHE_FILE)
+    return {
+        source: cache.get(source) if isinstance(cache.get(source), list) else []
+        for source in ("company", "team")
+    }
+
+
+def save_projects_cache(source, projects):
+    """한쪽(전사 또는 팀)만 갱신한다 - 다른 쪽 조회가 아직이거나 실패했어도 그쪽
+    캐시는 그대로 남겨야 한다."""
+    # build_project_tree는 넘겨받은 dict에 children을 직접 달아둔다 - 트리를 만든
+    # 뒤의 리스트를 그대로 저장하면 같은 프로젝트가 children 안에 통째로 또 들어가
+    # 파일이 몇 배로 부푼다. 저장할 때 children만 떼어낸다.
+    flat = [{k: v for k, v in p.items() if k != "children"} for p in projects]
+    with _projects_cache_lock:
+        cache = _load_json_cache(PROJECTS_CACHE_FILE)
+        cache[source] = flat
+        _save_json_cache(PROJECTS_CACHE_FILE, cache)

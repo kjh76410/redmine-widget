@@ -449,17 +449,29 @@ class App:
 
         self.panel = None
         self.panel_kind = None
-        self.company_tree = []
-        self.team_tree = []
-        self.company_projects_by_id = {}  # id -> {id, parent_id, name, ...} 평면 목록
-        self.team_projects_by_id = {}     # company_projects_by_id와 같은 형식, 팀 레드마인용
-        # (할당된 일감/즐겨찾기 그룹의 최상위 프로젝트 구분자를 찾는 데 쓴다 -
-        # _root_project_name 참고)
+        # 프로젝트 트리 두 개도 디스크에 저장돼 있어(redmine_projects_cache.json) 앱을
+        # 다시 켜자마자 지난 목록으로 그린다 - 트리 창뿐 아니라 할당된 일감/즐겨찾기의
+        # 최상위 프로젝트 구분자(_root_project_name)도 이 목록이 있어야 나오는데, 전에는
+        # 조회가 끝날 때까지 구분자 없이 그렸다가 다시 그리느라 목록이 한 번 튀었다.
+        cached_projects = redmine_api.load_projects_cache()
+        self.company_projects_by_id = {p["id"]: p for p in cached_projects["company"]}
+        self.team_projects_by_id = {p["id"]: p for p in cached_projects["team"]}
+        # (company_projects_by_id: id -> {id, parent_id, name, ...} 평면 목록,
+        # team_projects_by_id는 같은 형식의 팀 레드마인용)
+        self.company_tree = redmine_api.build_project_tree(cached_projects["company"])
+        self.team_tree = redmine_api.build_project_tree(cached_projects["team"])
 
-        self.my_issues = []
         self.favorites = redmine_api.load_favorites()
-        self.favorite_issues = {}  # f"{source}:{id}" -> issues 리스트(처음엔 최근 200건)
-        self.favorite_issue_totals = {}  # f"{source}:{id}" -> 전체 이슈 개수
+        # 할당된 일감/즐겨찾기 이슈도 디스크에 저장해 둔다(redmine_my_issues_cache.json /
+        # redmine_favorite_issues_cache.json) - 카드를 열자마자 지난 목록을 그리고 뒤에서
+        # 새로 받아 갱신한다. 배지 숫자도 셸이 뜨는 순간 이 캐시로 채운다
+        # (_push_shell_labels 참고).
+        self.my_issues = redmine_api.load_my_issues_cache()
+        # f"{source}:{id}" -> issues 리스트(처음엔 최근 200건) / 전체 이슈 개수
+        self.favorite_issues, self.favorite_issue_totals = (
+            redmine_api.load_favorite_issues_cache()
+        )
+        self._prune_favorite_issues_cache()
         # 배포 달력이 쓰는 버전 목록 - 디스크에 저장돼 있어 앱을 다시 켜도 남아있다
         # (redmine_calendar_cache.json). None은 "아직 한 번도 못 받아옴"이고 []는
         # "받아왔는데 종료일 잡힌 버전이 없음"이라, 화면이 "불러오는 중"과 "없음"을
@@ -524,9 +536,16 @@ class App:
 
     def _push_shell_labels(self):
         """프로젝트 트리 버튼 두 개의 툴팁을 넣어준다. 트리 창 제목과 같은 문구라
-        (TREE_TITLES 참고) shell.html에 또 적지 않고 SECTION_LABEL에서 가져온다."""
+        (TREE_TITLES 참고) shell.html에 또 적지 않고 SECTION_LABEL에서 가져온다.
+
+        같은 김에 일감 배지도 캐시로 미리 채운다 - 첫 조회는 알림 루프가 무작위
+        지연을 두고 시작해서(start_notify_loop) 배지가 몇 초에서 몇십 초쯤 비어
+        있었는데, 배지는 위젯을 접어놔도 늘 보이는 유일한 신호라 그 사이가 "일감
+        없음"으로 읽힌다."""
         data = json.dumps(SECTION_LABEL, ensure_ascii=False)
         self.shell.evaluate_js(f"setToolbarLabels({data})")
+        if self.my_issues:
+            self.shell.evaluate_js(f"setMyIssuesCount({len(self.my_issues)})")
 
     # ── 아이콘을 끌어서 위젯 옮기기 ────────────────
     def _clamp_icon_pos(self, x, y):
@@ -621,9 +640,16 @@ class App:
 
     # ── 백그라운드 조회 ──────────────────────────
     def refresh_trees(self):
+        # fetch_*_projects는 조회에 실패했을 때도 (API 키가 없을 때와 같이) 빈 리스트를
+        # 돌려준다 - 그걸 그대로 받아 쓰면 잠깐의 실패에 트리가 통째로 비어버리고, 캐시에
+        # 남아 있던 지난 목록까지 빈 목록으로 덮인다. 갖고 있는 목록이 있는 한 빈 결과는
+        # 무시하고 다음 회차를 기다린다(할당된 일감이 None을 건너뛰는 것과 같은 이유).
         def worker_company():
             projects = redmine_api.fetch_redmine_projects()
+            if not projects and self.company_projects_by_id:
+                return
             self.company_projects_by_id = {p["id"]: p for p in projects}
+            redmine_api.save_projects_cache("company", projects)
             self.company_tree = redmine_api.build_project_tree(projects)
             if self.panel_kind == "company_tree":
                 self._push_tree()
@@ -632,7 +658,10 @@ class App:
 
         def worker_team():
             projects = redmine_api.fetch_team_redmine_projects()
+            if not projects and self.team_projects_by_id:
+                return
             self.team_projects_by_id = {p["id"]: p for p in projects}
+            redmine_api.save_projects_cache("team", projects)
             self.team_tree = redmine_api.build_project_tree(projects)
             if self.panel_kind == "team_tree":
                 self._push_tree()
@@ -662,6 +691,7 @@ class App:
             self._notify_new_my_issues(issues)
 
         self.my_issues = issues
+        redmine_api.save_my_issues_cache(issues)
         if self.panel_kind == "my_issues":
             self._push_issues()
         self.shell.evaluate_js(f"setMyIssuesCount({len(issues)})")
@@ -690,12 +720,39 @@ class App:
                 source = fav.get("source", "company")
                 key = f"{source}:{fav['id']}"
                 issues, total = redmine_api.fetch_project_issue_list(fav["id"], source)
+                # 조회 실패도 ([], 0)으로 돌아온다(fetch_project_issue_list) - 갖고 있는
+                # 목록이 있으면 빈 결과로 덮지 않는다(refresh_trees와 같은 이유).
+                if not issues and self.favorite_issues.get(key):
+                    continue
                 self.favorite_issues[key] = issues
                 self.favorite_issue_totals[key] = total
+            self._save_favorite_issues_cache()
             if self.panel_kind == "favorites":
                 self._push_issues()
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _save_favorite_issues_cache(self):
+        # 저장하는 사이에 다른 스레드가 즐겨찾기를 추가/해제하면 json.dump가 "dictionary
+        # changed size during iteration"으로 터진다 - 얕은 복사본을 넘긴다.
+        redmine_api.save_favorite_issues_cache(
+            dict(self.favorite_issues), dict(self.favorite_issue_totals),
+        )
+
+    def _prune_favorite_issues_cache(self):
+        """즐겨찾기에서 빠진 프로젝트의 이슈가 캐시 파일에 남아 있으면 지운다 -
+        위젯이 꺼져 있는 동안 파일을 직접 손댔거나, 즐겨찾기 저장은 됐는데 이슈
+        캐시 저장 전에 앱이 죽은 경우에 남는다. 그냥 두면 다시는 안 쓸 이슈 수백
+        건이 파일에 계속 쌓인다."""
+        live = {f"{f.get('source', 'company')}:{f['id']}" for f in self.favorites}
+        stale = [key for key in self.favorite_issues if key not in live]
+        stale += [k for k in self.favorite_issue_totals if k not in live and k not in stale]
+        if not stale:
+            return
+        for key in stale:
+            self.favorite_issues.pop(key, None)
+            self.favorite_issue_totals.pop(key, None)
+        self._save_favorite_issues_cache()
 
     # ── 새 이슈 알림 (내 일감 + 즐겨찾기 프로젝트, 기본 3분 주기) ──
     def start_notify_loop(self):
@@ -880,6 +937,9 @@ class App:
         key = f"{source}:{project_id}"
         self.favorite_issues[key] = self.favorite_issues.get(key, []) + more
         self.favorite_issue_totals[key] = total
+        # 더 받아온 페이지까지 캐시에 남겨야, 앱을 다시 켰을 때도 방금 보던 만큼
+        # 그대로 보인다(다음 새로고침에서 다시 최근 200건으로 줄어든다).
+        self._save_favorite_issues_cache()
         return {"issues": more, "total": total}
 
     # ── 즐겨찾기 추가/해제 ────────────────────────
@@ -899,6 +959,7 @@ class App:
             ]
             self.favorite_issues.pop(key, None)
             self.favorite_issue_totals.pop(key, None)
+            self._save_favorite_issues_cache()
         else:
             self.favorites.append({"id": project_id, "name": name, "url": url, "source": source})
             self.refresh_favorite_issues()
@@ -1058,9 +1119,15 @@ class App:
         elif kind == "deploy_calendar":
             self.panel.events.loaded += self._push_calendar
         else:
+            # 캐시로 먼저 그린 뒤(_push_issues) 항상 뒤에서 다시 받아온다 - 배포 달력과
+            # 같은 방식(_push_calendar 참고). 전에는 "할당된 일감"이 비어 있을 때만
+            # 받아왔는데, 이제 캐시 덕에 비는 일이 없어서 그대로 두면 카드를 열어도
+            # 지난 목록만 계속 보인다.
             self.panel.events.loaded += self._push_issues
-            if kind == "my_issues" and not self.my_issues:
+            if kind == "my_issues":
                 self.refresh_my_issues()
+            else:
+                self.refresh_favorite_issues()
 
     def close_panel(self):
         """메인 아이콘을 누르면(shell.js의 mainIcon 클릭) 열려있던 카드를 닫는다."""
@@ -1313,7 +1380,14 @@ class App:
         pairs = [
             (f["id"], f["name"], f.get("source", "company")) for f in self.favorites
         ]
-        self.calendar_versions = redmine_api.fetch_calendar_versions(pairs)
+        versions = redmine_api.fetch_calendar_versions(pairs)
+        # fetch_calendar_versions는 조회에 실패한 프로젝트를 조용히 건너뛴다 - 네트워크가
+        # 통째로 끊긴 회차엔 빈 목록이 돌아오고, 그대로 저장하면 캐시에 남아 있던 배포
+        # 일정까지 지워진다("배포 예정 없음"으로 보인다). 갖고 있는 목록이 있으면 빈
+        # 결과는 무시한다(refresh_trees/refresh_favorite_issues와 같은 이유).
+        if not versions and self.calendar_versions:
+            return
+        self.calendar_versions = versions
         redmine_api.save_calendar_cache(self.calendar_versions)
         if self.panel_kind == "deploy_calendar":
             self._render_calendar()

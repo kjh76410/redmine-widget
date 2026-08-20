@@ -15,10 +15,13 @@
                 <span id="monthLabel"></span>
                 <button class="nav" id="nextMonth" title="다음 달">&rsaquo;</button>
                 <button class="today-btn" id="todayBtn">오늘</button>
+                <!-- 범례 자체를 달력 칸 칩과 같은 모양으로 둔다 - 글자가 곧 색 견본이라
+                     따로 점을 찍어 설명할 게 없다(calendar_panel.css .legend .key). -->
                 <span class="legend">
-                    <span class="key"><i class="dot planned"></i>예정</span>
-                    <span class="key"><i class="dot late"></i>지연</span>
-                    <span class="key"><i class="dot done"></i>배포됨</span>
+                    <span class="key planned">예정</span>
+                    <span class="key today">오늘</span>
+                    <span class="key late">지연</span>
+                    <span class="key done">배포됨</span>
                 </span>
                 <span id="refreshBtn" title="새로고침"></span>
             </div>

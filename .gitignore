@@ -12,6 +12,10 @@ widget_position.json
 redmine_seen_issues.json
 redmine_resolved_by_version_cache.json
 redmine_team_progress_cache.json
+redmine_calendar_cache.json
+redmine_my_issues_cache.json
+redmine_favorite_issues_cache.json
+redmine_projects_cache.json
 
 # 레드마인 API 키 (비밀번호와 같은 급 - 절대 커밋하지 않는다)
 # 파일은 각자 로컬에 두고, 위젯이 실행 중에 읽어 쓴다(redmine_api.py 참고).

@@ -130,6 +130,14 @@ RESOLVED_BY_VERSION_CACHE_FILE = Path(__file__).parent / "redmine_resolved_by_ve
 TEAM_PROGRESS_CACHE_FILE = Path(__file__).parent / "redmine_team_progress_cache.json"
 CALENDAR_CACHE_FILE = Path(__file__).parent / "redmine_calendar_cache.json"
 
+# "할당된 일감" / "즐겨찾기 프로젝트" / 프로젝트 트리(전사+팀) 화면이 마지막으로 받아온
+# 결과를 저장해 두는 파일 - 위 세 캐시와 같은 이유다. 이 셋은 원래 메모리에만 있어서,
+# 앱을 다시 켜면 첫 조회가 끝날 때까지(수 초) 카드가 빈 채로 보였다. 디스크에 남겨두면
+# 켜자마자 지난 목록을 바로 그리고(배지 숫자도 즉시 채우고) 뒤에서 새로 받아 갱신한다.
+MY_ISSUES_CACHE_FILE = Path(__file__).parent / "redmine_my_issues_cache.json"
+FAVORITE_ISSUES_CACHE_FILE = Path(__file__).parent / "redmine_favorite_issues_cache.json"
+PROJECTS_CACHE_FILE = Path(__file__).parent / "redmine_projects_cache.json"
+
 # 새 이슈를 확인하는 주기(ms) - 이 위젯을 여러 사람(예: 120명)이 같이 쓰면 사용자
 # 수만큼 요청이 곱해져 레드마인 서버에 꾸준히 부하가 걸린다. 1분은 그러기엔 짧아서
 # 3분으로 늘렸다.

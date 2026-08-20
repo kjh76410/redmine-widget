@@ -96,6 +96,14 @@ function versionState(v) {
     return "planned";
 }
 
+// 달력 칸 칩의 배경색 기준. versionState는 오늘 나가는 배포도 "예정"으로 보지만,
+// 달력에서는 오늘 것만 따로 보여야 해서 왼쪽 목록(renderUpcomingItem)과 같은
+// 규칙으로 today를 갈라 준다.
+function chipTone(v) {
+    const state = versionState(v);
+    return state === "planned" && v.due_date === today ? "today" : state;
+}
+
 function stateLabel(state) {
     if (state === "done") return "배포됨";
     if (state === "late") return "지연";
@@ -180,12 +188,10 @@ function renderDayCell(date) {
         list.className = "items";
         items.slice(0, MAX_CHIPS).forEach((v) => {
             const chip = document.createElement("div");
-            chip.className = "chip";
+            // 상태는 점이 아니라 칩 배경색으로 알린다 - 칸이 좁아 점 하나에 7px + 간격
+            // 4px을 쓰면 그만큼 버전 이름이 잘렸다(calendar_panel.css .chip 참고).
+            chip.className = "chip " + chipTone(v);
             chip.title = `${v.project} - ${v.version} (${stateLabel(versionState(v))})`;
-
-            const dot = document.createElement("i");
-            dot.className = "dot " + versionState(v);
-            chip.appendChild(dot);
 
             const name = document.createElement("span");
             name.className = "name";
@@ -310,7 +316,10 @@ function renderUpcomingItem(v) {
     const diff = dayDiff(today, v.due_date);
 
     const item = document.createElement("div");
-    item.className = "up-item";
+    // 카드 배경색이 상태를 따라간다(calendar_panel.css .up-item.late 등). 오늘 나가는
+    // 배포는 versionState 기준으로는 "예정"이지만, D-day 배지와 카드 색이 따로 놀지
+    // 않게 여기서만 today를 따로 둔다.
+    item.className = "up-item " + (state === "planned" && diff === 0 ? "today" : state);
     item.title = `${v.project} - ${v.version} (${v.due_date}, ${stateLabel(state)})`;
 
     const dday = document.createElement("span");
@@ -401,7 +410,7 @@ function renderDayCard(v) {
     const state = versionState(v);
 
     const card = document.createElement("div");
-    card.className = "day-card";
+    card.className = "day-card " + state;  // 목록 카드와 같은 상태별 배경색
     card.title = "레드마인에서 이 버전 열기";
 
     const version = document.createElement("div");

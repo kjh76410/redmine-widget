@@ -1,12 +1,21 @@
 /* 배포 상태 색. 점(달력 칸) / D-day 배지(왼쪽 목록) / 상태 필·진행률 막대(상세 카드)
    네 군데에 같은 색이 흩어져 있어서, 하나만 고쳐도 어긋나지 않도록 여기 모아 둔다.
    (이 프로젝트의 다른 CSS는 색을 리터럴로 적지만, 여기는 한 상태가 네 곳에 걸쳐 있어
-   변수 쪽이 확실히 낫다.) */
+   변수 쪽이 확실히 낫다.)
+
+   상태마다 색이 둘씩인 이유: 파스텔은 배경으로만 쓸 수 있고 그 위 글씨는 진해야
+   읽힌다. 일감 목록의 트래커/우선순위 뱃지가 쓰는 방식과 같다(issues_panel.js의
+   TRACKER_COLORS - [배경, 글자] 짝). 7px짜리 점과 진행률 막대는 배경이 아니라
+   그 자체가 보여야 하는 것이라 파스텔이 아닌 -ink 쪽을 쓴다. */
 :root {
-    --state-planned: #1E62D0;  /* 예정 - 아직 안 나간 배포 */
-    --state-late:    #C2410C;  /* 지연 - 종료일이 지났는데 안 닫힌 배포 */
-    --state-done:    #1F7A63;  /* 배포됨 - 닫힌 버전 */
-    --state-today:   #E5484D;  /* 오늘 나가는 배포 - 지연이 주황을 가져가면서 비워진 빨강 */
+    --state-planned-soft: #EAF3FD;  /* 예정 - 아직 안 나간 배포. 제일 흔한 상태라 가장 옅게 */
+    --state-planned-ink:  #2D5F8A;
+    --state-late-soft:    #FBDBDB;  /* 지연 - 종료일이 지났는데 안 닫힌 배포 */
+    --state-late-ink:     #B3382E;
+    --state-done-soft:    #E7E9ED;  /* 배포됨 - 닫힌 버전. 이미 끝난 일이라 회색으로 물러난다 */
+    --state-done-ink:     #667085;
+    --state-today-soft:   #E4F6EA;  /* 오늘 나가는 배포 - 초록. 완료가 회색으로 비켜서 쓸 수 있게 된 자리 */
+    --state-today-ink:    #2F9E68;
 }
 
 * { box-sizing: border-box; }
@@ -47,7 +56,10 @@ html, body {
 
 /* ── 왼쪽: 다가오는 일정 / 날짜별 상세 ────────── */
 #colUpcoming {
-    width: 300px;
+    /* 여기서 줄인 만큼 오른쪽 달력(#colCalendar, flex:1)이 넓어진다. 목록 쪽 글자는
+       한 줄 말줄임이라 좁혀도 깨지진 않지만, D-day 칩 48px + 좌우 여백 20px + 칩과
+       본문 사이 8px은 고정이라 그만큼은 늘 빠진다(지금 폭이면 본문에 164px 남는다). */
+    width: 240px;
     flex: none;
     min-height: 0;
     overflow-y: auto;
@@ -118,38 +130,54 @@ html, body {
 }
 
 .left-tab.late.active {
-    border-color: var(--state-late);
-    background: var(--state-late);
+    border-color: var(--state-late-ink);
+    background: var(--state-late-soft);
+    color: var(--state-late-ink);
 }
 
+/* 목록의 일정 하나 - 날짜 상세(.day-card)와 같은 카드 모양으로 맞춘다. 배경을
+   상태별 파스텔로 깔아서, 목록을 훑기만 해도 지연(분홍)/배포됨(민트)이 글자보다
+   먼저 눈에 들어온다. 테두리는 평소엔 투명이고 hover에서만 진해진다 - 카드마다
+   테두리를 그으면 색 띠가 여러 겹으로 겹쳐 보여 오히려 산만하다. */
 .up-item {
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    padding: 7px 10px;
-    border-radius: 8px;
+    padding: 9px 10px;
+    margin: 0 0 8px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: var(--state-planned-soft);
     cursor: pointer;
 }
 
+.up-item.late  { background: var(--state-late-soft); }
+.up-item.done  { background: var(--state-done-soft); }
+.up-item.today { background: var(--state-today-soft); }
+
 .up-item:hover {
-    background: #DBE2ED;
+    border-color: #152340;
 }
 
 .up-item .dday {
     flex: none;
-    width: 48px;
+    /* 고정 폭이 아니라 최소 폭이다 - "D-8"처럼 짧은 글자는 여기 맞춰 세로로 줄이
+       맞고, "배포됨"이나 "+120일"처럼 긴 글자는 잘리거나 두 줄로 접히는 대신 그만큼만
+       늘어난다(폭을 줄이면서 잘림이 생길 자리를 미리 막아둔다). */
+    min-width: 38px;
     text-align: center;
-    padding: 2px 0;
+    padding: 2px 5px;
+    white-space: nowrap;
     border-radius: 7px;
-    background: var(--state-planned);
+    background: var(--state-planned-ink);
     color: #FFFFFF;
     font-size: 10.5px;
     font-weight: 700;
 }
 
-.up-item .dday.late { background: var(--state-late); }
-.up-item .dday.done { background: var(--state-done); }
-.up-item .dday.today { background: var(--state-today); }
+.up-item .dday.late  { background: var(--state-late-ink); }
+.up-item .dday.done  { background: var(--state-done-ink); }
+.up-item .dday.today { background: var(--state-today-ink); }
 
 .up-item .body {
     flex: 1;
@@ -175,7 +203,7 @@ html, body {
 }
 
 .up-item .date {
-    color: #8993A4;
+    color: #6E7A8C;  /* 흰 배경일 때보다 한 톤 진하게 - 파스텔 위에선 #8993A4가 흐릿하다 */
     font-size: 10px;
     margin-top: 2px;
 }
@@ -203,13 +231,16 @@ html, body {
 
 /* 날짜 상세 카드 - 그 날 나가는 버전 하나 (진행률은 눌렀을 때 따로 받아 채운다) */
 .day-card {
-    background: #FFFFFF;
-    border: 1px solid #CED4DA;
+    background: var(--state-planned-soft);
+    border: 1px solid transparent;
     border-radius: 10px;
     padding: 10px 12px;
     margin: 0 0 8px;
     cursor: pointer;
 }
+
+.day-card.late { background: var(--state-late-soft); }
+.day-card.done { background: var(--state-done-soft); }
 
 .day-card:hover {
     border-color: #152340;
@@ -241,11 +272,11 @@ html, body {
     font-size: 10px;
     font-weight: 700;
     color: #FFFFFF;
-    background: var(--state-planned);
+    background: var(--state-planned-ink);
 }
 
-.day-card .state.late { background: var(--state-late); }
-.day-card .state.done { background: var(--state-done); }
+.day-card .state.late { background: var(--state-late-ink); }
+.day-card .state.done { background: var(--state-done-ink); }
 
 .day-card .progress {
     margin-top: 8px;
@@ -254,18 +285,20 @@ html, body {
 .day-card .progress .track {
     height: 6px;
     border-radius: 3px;
-    background: #E3E7ED;
+    /* 카드 배경이 상태마다 다른 파스텔이라 고정 회색을 깔면 어떤 카드에선 튀고
+       어떤 카드에선 묻힌다 - 흰색을 반투명으로 얹어 어느 색 위에서든 같게 보이게 한다. */
+    background: rgba(255, 255, 255, 0.75);
     overflow: hidden;
 }
 
 .day-card .progress .fill {
     height: 100%;
     border-radius: 3px;
-    background: var(--state-planned);
+    background: var(--state-planned-ink);
 }
 
 .day-card .progress .fill.done {
-    background: var(--state-done);
+    background: var(--state-done-ink);
 }
 
 .day-card .progress .caption {
@@ -338,17 +371,24 @@ html, body {
 .legend {
     margin-left: auto;
     display: flex;
-    gap: 12px;
+    gap: 5px;
 }
 
+/* 달력 칸의 칩(.chip)과 같은 모양·같은 색 - 범례와 실물이 눈에 똑같이 보여야
+   설명이 된다. 칸에서는 "오늘"도 따로 색이 있어서 범례도 넷이다(chipTone 참고). */
 .legend .key {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    color: #5A6B85;
-    font-size: 10.5px;
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: var(--state-planned-soft);
+    color: var(--state-planned-ink);
+    font-size: 10px;
     font-weight: 700;
+    line-height: 1.6;
 }
+
+.legend .key.today { background: var(--state-today-soft); color: var(--state-today-ink); }
+.legend .key.late  { background: var(--state-late-soft);  color: var(--state-late-ink); }
+.legend .key.done  { background: var(--state-done-soft);  color: var(--state-done-ink); }
 
 /* 검색란 돋보기(issues_panel.css #searchBtn)와 같은 마스크 방식 - 즐겨찾기 프로젝트
    전체의 배포 버전을 다시 받아온다(calendar_panel.js 참고). .legend가 이미
@@ -370,18 +410,6 @@ html, body {
 #refreshBtn:hover {
     background: #152340;
 }
-
-.dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    flex: none;
-}
-
-.dot.planned { background: var(--state-planned); }
-.dot.late    { background: var(--state-late); }
-.dot.done    { background: var(--state-done); }
 
 #weekdays {
     display: grid;
@@ -474,6 +502,7 @@ html, body {
     color: #FFFFFF;
 }
 
+
 /* 날짜 숫자와 공휴일 이름이 한 줄에 나란히 - 칸이 좁아서 이름은 남는 만큼만 보이고
    나머지는 잘린다(전체는 칸 title로 확인할 수 있다). */
 .day .num-row {
@@ -527,21 +556,25 @@ html, body {
     overflow: hidden;
 }
 
-/* 버전 하나 - 점 + 이름. 칸이 좁아서 이름은 잘리는 대신 title로 전체를 보여준다. */
+/* 버전 하나 - 이름만. 칸이 좁아서 이름은 잘리는 대신 title로 전체를 보여준다.
+   상태는 왼쪽 목록 카드와 같은 파스텔 배경으로 알린다(예전엔 앞에 점을 찍었는데,
+   점 7px + 간격 4px이 가뜩이나 좁은 칸에서 이름 두세 글자를 잡아먹었다). */
 .chip {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 1px 4px;
+    display: block;
+    padding: 1px 5px;
     border-radius: 5px;
-    background: #EDF1F6;
-    color: #152340;
+    background: var(--state-planned-soft);
+    color: var(--state-planned-ink);
     font-size: 10px;
     font-weight: 700;
     line-height: 1.5;
     flex: none;
     min-width: 0;
 }
+
+.chip.late  { background: var(--state-late-soft);  color: var(--state-late-ink); }
+.chip.done  { background: var(--state-done-soft);  color: var(--state-done-ink); }
+.chip.today { background: var(--state-today-soft); color: var(--state-today-ink); }
 
 .chip .name {
     overflow: hidden;
