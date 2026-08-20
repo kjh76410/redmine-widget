@@ -122,14 +122,23 @@ FAVORITES_FILE = Path(__file__).parent / "redmine_favorites.json"
 # 즐겨찾기한 프로젝트에서 이미 알림을 보낸 이슈 id 목록이 저장되는 파일 (앱을 다시 실행해도 유지됨)
 SEEN_ISSUES_FILE = Path(__file__).parent / "redmine_seen_issues.json"
 
-# "버전별 연결된 일감" / "팀별 진행상황" 화면이 마지막으로 받아온 결과를 저장해 두는
-# 파일 - 패널을 열 때마다 레드마인 응답을 기다리지 않고 이 캐시부터 보여준 뒤, 뒤에서
-# 새로 받아와 갱신한다(App.get_resolved_by_version / get_team_progress 참고).
+# "버전별 연결된 일감" / "팀별 진행상황" / "배포 달력" 화면이 마지막으로 받아온 결과를
+# 저장해 두는 파일 - 패널을 열 때마다 레드마인 응답을 기다리지 않고 이 캐시부터 보여준
+# 뒤, 뒤에서 새로 받아와 갱신한다(App.get_resolved_by_version / get_team_progress /
+# _reload_calendar 참고).
 RESOLVED_BY_VERSION_CACHE_FILE = Path(__file__).parent / "redmine_resolved_by_version_cache.json"
 TEAM_PROGRESS_CACHE_FILE = Path(__file__).parent / "redmine_team_progress_cache.json"
+CALENDAR_CACHE_FILE = Path(__file__).parent / "redmine_calendar_cache.json"
 
-# 새 이슈를 확인하는 주기(ms)
-NOTIFY_POLL_INTERVAL_MS = 60 * 1000
+# 새 이슈를 확인하는 주기(ms) - 이 위젯을 여러 사람(예: 120명)이 같이 쓰면 사용자
+# 수만큼 요청이 곱해져 레드마인 서버에 꾸준히 부하가 걸린다. 1분은 그러기엔 짧아서
+# 3분으로 늘렸다.
+NOTIFY_POLL_INTERVAL_MS = 3 * 60 * 1000
+
+# 폴링 시작/주기에 더할 무작위 지연 폭(ms, main.py App.start_notify_loop 참고) -
+# 출근 직후처럼 여러 PC가 한꺼번에 위젯을 켜도(자동 실행) 요청이 정확히 같은 순간에
+# 몰리지 않고 이 폭 안에서 흩어지게 한다.
+NOTIFY_POLL_JITTER_MS = 30 * 1000
 
 # True면 즐겨찾기 여부와 상관없이 전사 레드마인 전체 프로젝트의 새 이슈를 알림.
 # 프로젝트가 많으면(수백 개) 1분 주기 안에 순서대로 다 조회하지 못해 요청이 밀리고
@@ -137,10 +146,10 @@ NOTIFY_POLL_INTERVAL_MS = 60 * 1000
 NOTIFY_ALL_PROJECTS = False
 
 # ─────────────────────────────────────────────
-# 전사 레드마인 프로젝트 목록 자동 조회
-#   1) 레드마인 내 계정 > 개인 설정 페이지에서 API 키 발급
-#   2) redmine_api_key.txt 파일을 열어 키 값만 붙여넣고 저장
-#      (이 파일은 이 PC에만 저장되며 대화창에는 입력하지 않는 것을 권장)
+# 전사/팀 레드마인 프로젝트 목록 자동 조회
+#   위젯 아이콘 우클릭 메뉴 > "전사 레드마인 API 키 설정"/"팀 레드마인 API 키 설정"
+#   팝업에 레드마인 내 계정 > 개인 설정 페이지에서 발급받은 API 키를 붙여넣으면 아래
+#   파일에 저장된다(이 PC에만 저장됨). 파일을 직접 열어 값만 붙여넣어도 동일하게 동작한다.
 # ─────────────────────────────────────────────
 REDMINE_BASE_URL = "http://10.1.100.150/redmine"
 REDMINE_API_KEY_FILE = Path(__file__).parent / "redmine_api_key.txt"
@@ -149,9 +158,6 @@ REDMINE_API_KEY_PLACEHOLDER = "PUT_YOUR_API_KEY_HERE"
 # 팀 레드마인 (전사 레드마인과 별도 서버, 자체 API 키 사용)
 TEAM_REDMINE_BASE_URL = "http://10.1.100.20"
 TEAM_REDMINE_API_KEY_FILE = Path(__file__).parent / "team_redmine_api_key.txt"
-
-# "할당된 일감" 목록 조회에 쓸 레드마인 사용자 ID(숫자)가 저장되는 파일 (앱을 다시 실행해도 유지됨)
-REDMINE_USER_ID_FILE = Path(__file__).parent / "redmine_user_id.txt"
 
 
 def load_app_font():

@@ -1,14 +1,10 @@
-document.getElementById("itemRefreshRedmine").addEventListener("click", () => {
-    window.pywebview.api.refresh_redmine();
+document.getElementById("itemSetCompanyApiKey").addEventListener("click", () => {
     window.pywebview.api.close_context_menu();
+    window.pywebview.api.open_api_key_dialog("company");
 });
-document.getElementById("itemRefreshMyIssues").addEventListener("click", () => {
-    window.pywebview.api.refresh_my_issues();
+document.getElementById("itemSetTeamApiKey").addEventListener("click", () => {
     window.pywebview.api.close_context_menu();
-});
-document.getElementById("itemSetUserId").addEventListener("click", () => {
-    window.pywebview.api.close_context_menu();
-    window.pywebview.api.open_user_id_dialog();
+    window.pywebview.api.open_api_key_dialog("team");
 });
 // 이 항목들은 메뉴를 닫지 않는다 - 켜고 끈 결과(체크 표시)를 바로 보여주려는 것.
 document.getElementById("itemAutostart").addEventListener("click", () => {

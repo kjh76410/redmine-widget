@@ -71,10 +71,10 @@ mainIcon.addEventListener("pointercancel", endDrag);
 mainIcon.addEventListener("click", () => {
     if (dragged) return;  // 방금 끌어서 옮긴 것 - 툴바를 여닫지 않는다
     // 메인 아이콘을 누르면 열려 있던 건 다 닫는다 - 카드(트리/일감/버전별 연결된 일감),
-    // 우클릭 메뉴, 아이디 설정 창까지.
+    // 우클릭 메뉴, API 키 설정 창까지.
     window.pywebview.api.close_panel();
     window.pywebview.api.close_context_menu();
-    window.pywebview.api.close_user_id_dialog();
+    window.pywebview.api.close_api_key_dialog();
     setPanelOpen(!panelOpen);
 });
 

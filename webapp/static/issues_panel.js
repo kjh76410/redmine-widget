@@ -1,6 +1,6 @@
 // 파이썬(App._push_issues)이 호출하는 진입점.
 // data: {kind, title, groups: [{project, issues:[{issue_id,title,url,tracker,priority}],
-//                                section?, project_id?, source?, total?}]}
+//                                section?, parent?, project_id?, source?, total?}]}
 let currentKind = null;
 let currentGroups = [];
 let selectedIndex = -1;
@@ -10,6 +10,16 @@ let rightIssuesBase = [];  // 현재 오른쪽에 보여줄 "필터 적용 전" 
 let loadingMore = false;
 let searchToken = 0;
 let searchWords = [];  // 검색 중일 때 결과 제목에서 <mark>로 강조할 단어들
+
+// 새로고침 아이콘 - "할당된 일감"/"즐겨찾기 프로젝트" 중 지금 보고 있는 화면에 맞는
+// 쪽만 다시 받아온다(우클릭 메뉴에 있던 항목들을 각 화면 안으로 옮긴 것).
+document.getElementById("refreshBtn").addEventListener("click", () => {
+    if (currentKind === "my_issues") {
+        window.pywebview.api.refresh_my_issues();
+    } else {
+        window.pywebview.api.refresh_favorites();
+    }
+});
 
 const TRACKER_COLORS = {
     "VoC": ["#FBE0E9", "#A23F63"],
@@ -47,6 +57,7 @@ function renderIssuesPanel(data) {
     searchMode = false;
     searchWords = [];
     rightIssuesBase = [];
+    document.getElementById("leftTitle").textContent = data.title || "";
     document.getElementById("searchInput").value = "";
     // "전체 프로젝트" 토글은 즐겨찾기 검색에서만 의미가 있다("할당된 일감"은 이미
     // 전체 프로젝트 대상의 내 일감 목록이라 좁히고 넓힐 대상이 없다).
@@ -84,6 +95,7 @@ function renderLeft() {
         return;
     }
     let lastSection = null;
+    let lastParent = null;
     currentGroups.forEach((g, i) => {
         if (g.section && g.section !== lastSection) {
             const head = document.createElement("div");
@@ -99,7 +111,18 @@ function renderLeft() {
             }
             left.appendChild(head);
             lastSection = g.section;
+            lastParent = null;  // 구분자(레드마인)가 바뀌면 최상위 프로젝트 구분도 새로 센다
         }
+        // 즐겨찾기 프로젝트의 최상위 프로젝트가 자기 자신이 아니면("할당된 일감" 목록처럼)
+        // 그 이름으로 한 단계 더 작은 구분자를 넣는다. 최상위 프로젝트 자체(g.parent 없음)는
+        // 이름이 카드와 겹치니 구분자를 따로 안 넣는다.
+        if (g.parent && g.parent !== lastParent) {
+            const subHead = document.createElement("div");
+            subHead.className = "sub-section";
+            subHead.textContent = g.parent;
+            left.appendChild(subHead);
+        }
+        lastParent = g.parent || null;
         const card = document.createElement("div");
         card.className = "project-card" + (!searchMode && i === selectedIndex ? " selected" : "");
         // 즐겨찾기 창에서만 이름 앞에 별을 붙인다 - 여기 뜨는 프로젝트는 전부 이미 즐겨찾기된

@@ -20,7 +20,11 @@ html, body {
     align-items: center;
     padding: 0 30px 0 14px;
     cursor: pointer;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+    /* 그림자 없음 - 토스트가 여러 개 쌓이면(TOAST_GAP) 창마다 그림자가 겹쳐 아래로
+       갈수록 얼룩진 것처럼 보였다. CSS 쪽은 이렇게 없앴지만, 윈도우 11 DWM이 창
+       모서리를 둥글게 깎으면서(main.py _round_window_corners) 그 자체 그림자를
+       또 붙이는 게 남아 있었다 - 그건 OS가 그리는 것이라 CS_DROPSHADOW 창 클래스
+       스타일을 꺼서 따로 막는다(_round_window_corners 참고). */
 }
 
 #closeBtn {

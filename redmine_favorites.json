@@ -13,12 +13,6 @@
     "source": "company"
   },
   {
-    "id": 3,
-    "name": "해외 프로젝트",
-    "url": "http://10.1.100.150/redmine/projects/out_projects/issues",
-    "source": "company"
-  },
-  {
     "id": 146,
     "name": "Nokia 프로젝트",
     "url": "http://10.1.100.150/redmine/projects/mcx-out/issues",
@@ -82,7 +76,8 @@
     "id": 17,
     "name": "450 Connect",
     "url": "http://10.1.100.150/redmine/projects/out_ger_450_connect/issues",
-    "source": "company"
+    "source": "company",
+    "notify": true
   },
   {
     "id": 121,
@@ -136,6 +131,18 @@
     "id": 260,
     "name": "NORTHCOM DK",
     "url": "http://10.1.100.150/redmine/projects/northcom-dk/issues",
+    "source": "company"
+  },
+  {
+    "id": 79,
+    "name": "공공안전통신망",
+    "url": "http://10.1.100.150/redmine/projects/pslte_lter_ltea/issues",
+    "source": "company"
+  },
+  {
+    "id": 301,
+    "name": "DMR/CPS",
+    "url": "http://10.1.100.150/redmine/projects/dmr/issues",
     "source": "company"
   }
 ]

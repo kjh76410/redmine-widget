@@ -35,20 +35,27 @@ html, body {
     margin-bottom: 12px;
 }
 
-#idInput {
-    width: 100%;
+#inputRow {
+    display: flex;
+    gap: 6px;
+}
+
+#keyInput {
+    flex: 1;
+    min-width: 0;
     height: 34px;
     border-radius: 8px;
     border: 1px solid #313F63;
     background: #233149;
     color: #E4E9F2;
     font-size: 13px;
-    font-family: inherit;
+    /* 고정폭 글꼴을 쓰면 키를 "표시" 상태로 봤을 때 오타를 눈으로 확인하기 쉽다 */
+    font-family: "Consolas", "Noto Sans KR", monospace;
     padding: 0 10px;
     outline: none;
 }
 
-#idInput:focus {
+#keyInput:focus {
     border-color: #6E92C8;
 }
 
@@ -68,6 +75,13 @@ button.dlg-btn {
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
+    white-space: nowrap;
+}
+
+#btnToggle {
+    background: #313F63;
+    color: #E4E9F2;
+    padding: 7px 12px;
 }
 
 #btnCancel {

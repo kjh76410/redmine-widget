@@ -54,6 +54,10 @@ TEAM_PROJECTS = [
     _project(501, 500, "소방 무전 연동", source="team"),
 ]
 
+# id -> 이름 - _fake_fetch_recent_issues가 이슈의 "실제 소속 프로젝트" 이름을
+# 붙이는 데 쓴다(진짜 fetch_recent_issues의 project 필드를 흉내).
+_PROJECT_NAME_BY_ID = {p["id"]: p["name"] for p in COMPANY_PROJECTS + TEAM_PROJECTS}
+
 # ── 일감 ─────────────────────────────────────
 TRACKERS = ["결함", "개발", "VoC", "디자인", "분석", "업무내용", "요구사항", "이슈", "기술문의", "접수", "기타"]
 PRIORITIES = ["낮음", "보통", "높음", "긴급", "즉시"]
@@ -98,7 +102,7 @@ def _project_issues(project_id, count):
 
 
 # ── 갈아끼우기 ─────────────────────────────────
-def _fake_fetch_my_issues(identifier):
+def _fake_fetch_my_issues():
     return list(MY_ISSUES)
 
 
@@ -120,9 +124,11 @@ def _fake_fetch_recent_issues(project_id, source="company"):
     pid = int(project_id)
     tick = int(time.time() // _TOAST_TICK_S)
     newest = pid * 1000 + (tick + pid) // 4
+    project_name = _PROJECT_NAME_BY_ID.get(pid, f"프로젝트 {pid}")
     return [{"id": 90000 + newest - n,
              "subject": SUBJECTS[(newest + n) % len(SUBJECTS)],
-             "url": f"http://demo/issues/{90000 + newest - n}"}
+             "url": f"http://demo/issues/{90000 + newest - n}",
+             "project": project_name}
             for n in range(5)]
 
 
@@ -326,17 +332,21 @@ def install():
     redmine_api.fetch_calendar_versions = _fake_fetch_calendar_versions
     redmine_api.fetch_version_issue_counts = _fake_fetch_version_issue_counts
     redmine_api.fetch_current_user_id = lambda: 1
-    redmine_api.resolve_user_id = lambda identifier: 1
-    redmine_api.load_redmine_user_id = lambda: "demo"
     redmine_api.search_project_issues = _fake_search_project_issues
     redmine_api.search_all_projects_issues = _fake_search_all_projects_issues
 
-    # 저장 계열은 전부 막는다 - 데모가 진짜 즐겨찾기/알림 기록/아이디 파일을 건드리면 안 된다.
+    # API 키 설정 팝업이 열려 있는지/뭘 채워 보여줄지 판단하는 데 쓰인다 - 데모에서도
+    # "키가 설정돼 있다"고 답해야 _reload_my_issues의 알림 기준 갱신 분기도 그대로 탄다.
+    redmine_api.load_redmine_api_key = lambda: "demo-key"
+    redmine_api.load_team_redmine_api_key = lambda: "demo-key"
+
+    # 저장 계열은 전부 막는다 - 데모가 진짜 즐겨찾기/알림 기록/API 키 파일을 건드리면 안 된다.
     redmine_api.load_favorites = lambda: [dict(f) for f in FAVORITES]
     redmine_api.save_favorites = lambda favorites: None
     redmine_api.load_seen_issues = lambda: dict(_seen)
     redmine_api.save_seen_issues = lambda seen: _seen.update(seen)
-    redmine_api.save_redmine_user_id = lambda value: None
+    redmine_api.save_redmine_api_key = lambda value: None
+    redmine_api.save_team_redmine_api_key = lambda value: None
 
 
 def main():

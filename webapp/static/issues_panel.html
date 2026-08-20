@@ -6,9 +6,17 @@
 </head>
 <body>
 <div id="win">
-    <!-- 상단 헤더 없이 창 전체가 좌: 프로젝트 사이드바 / 우: 일감 영역 2단이다 -->
+    <!-- 창 전체는 좌: 프로젝트 사이드바 / 우: 일감 영역 2단이고, 그 헤더(제목 + 새로고침)는
+         사이드바 안에서 목록과 세로로 한 번 더 나뉜다(resolved_panel.html의 #colProjectWrap과
+         같은 구조) - 오른쪽 일감 영역은 검색란이 그 자리를 대신하니 헤더가 따로 없다. -->
     <div id="body">
-        <div id="left"></div>
+        <div id="leftWrap">
+            <div id="leftHeader">
+                <span id="leftTitle"></span>
+                <span id="refreshBtn" title="새로고침"></span>
+            </div>
+            <div id="left"></div>
+        </div>
         <div id="divider"></div>
         <!-- 오른쪽은 검색란 + 유형 필터 뱃지(둘 다 고정) + 일감 목록(스크롤) 3단 -->
         <div id="rightPane">

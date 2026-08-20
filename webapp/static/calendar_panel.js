@@ -512,6 +512,9 @@ function shiftMonth(delta) {
     renderCalendar();
 }
 
+document.getElementById("refreshBtn").addEventListener("click", () => {
+    window.pywebview.api.refresh_calendar();
+});
 document.getElementById("prevMonth").addEventListener("click", () => shiftMonth(-1));
 document.getElementById("nextMonth").addEventListener("click", () => shiftMonth(1));
 document.getElementById("todayBtn").addEventListener("click", () => {

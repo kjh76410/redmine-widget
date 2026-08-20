@@ -11,6 +11,7 @@ import base64
 import ctypes
 import functools
 import json
+import random
 import re
 import sys
 import threading
@@ -86,7 +87,7 @@ def _apply_geometry(win, width=None, height=None, x=None, y=None, scale_size=Tru
 CARD_BG = {
     "shell.html": "#152340",
     "context_menu.html": "#152340",
-    "user_id_dialog.html": "#152340",
+    "api_key_dialog.html": "#152340",
     "panel.html": "#F1F3F5",
     "issues_panel.html": "#F1F3F5",
     "resolved_panel.html": "#F1F3F5",
@@ -103,6 +104,9 @@ _SHELL_ANIM_STEPS = 10
 
 _DWMWA_WINDOW_CORNER_PREFERENCE = 33
 _DWMWCP_ROUND = 2  # 윈도우 11 기본 창과 같은 반지름(이 화면 기준 약 8px)
+
+_GCL_STYLE = -26  # WinUser.h GCL_STYLE
+_CS_DROPSHADOW = 0x00020000
 
 
 def _round_window_corners(win):
@@ -144,6 +148,21 @@ def _round_window_corners(win):
             ctypes.byref(pref),
             ctypes.sizeof(pref),
         )
+    except (AttributeError, OSError):
+        pass
+
+    # 라운딩을 걸면 윈도우 11 DWM이 창마다 기본 그림자도 같이 입힌다 - 토스트처럼
+    # 여러 창이 촘촘하게(TOAST_GAP) 쌓이면 그림자가 서로 겹쳐 아래로 갈수록 얼룩진
+    # 것처럼 보였다. CSS box-shadow를 지워도 이건 OS가 그리는 것이라 안 없어져서,
+    # 창 클래스 스타일의 CS_DROPSHADOW 비트를 직접 꺼서 막는다.
+    try:
+        get_style = ctypes.windll.user32.GetClassLongPtrW
+        set_style = ctypes.windll.user32.SetClassLongPtrW
+        get_style.restype = ctypes.c_ulonglong
+        set_style.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_ulonglong]
+        style = get_style(ctypes.c_void_p(hwnd), _GCL_STYLE)
+        if style & _CS_DROPSHADOW:
+            set_style(ctypes.c_void_p(hwnd), _GCL_STYLE, style & ~_CS_DROPSHADOW)
     except (AttributeError, OSError):
         pass
 
@@ -300,14 +319,17 @@ class Api:
     def refresh_my_issues(self):
         self._app.refresh_my_issues()
 
-    def open_user_id_dialog(self):
-        self._app.open_user_id_dialog()
+    def refresh_favorites(self):
+        self._app.refresh_favorite_issues()
 
-    def close_user_id_dialog(self):
-        self._app.close_user_id_dialog()
+    def open_api_key_dialog(self, kind):
+        self._app.open_api_key_dialog(kind)
 
-    def save_user_id(self, value):
-        self._app.save_user_id(value)
+    def close_api_key_dialog(self):
+        self._app.close_api_key_dialog()
+
+    def save_api_key(self, value):
+        self._app.save_api_key(value)
 
     def open_context_menu(self):
         self._app.open_context_menu()
@@ -354,11 +376,20 @@ class Api:
     def get_resolved_by_version(self, project_id):
         return self._app.get_resolved_by_version(project_id)
 
+    def refresh_resolved_by_version(self, project_id):
+        self._app.refresh_resolved_by_version(project_id)
+
     def get_team_progress(self, project_id):
         return self._app.get_team_progress(project_id)
 
+    def refresh_team_progress(self, project_id):
+        self._app.refresh_team_progress(project_id)
+
     def get_version_progress(self, version_id, source):
         return self._app.get_version_progress(version_id, source)
+
+    def refresh_calendar(self):
+        self._app.refresh_calendar()
 
     def open_toast_url(self, toast_id, url):
         self._app.open_toast_url(toast_id, url)
@@ -421,17 +452,19 @@ class App:
         self.company_tree = []
         self.team_tree = []
         self.company_projects_by_id = {}  # id -> {id, parent_id, name, ...} 평면 목록
-        # (할당된 일감 그룹의 최상위 프로젝트 구분자를 찾는 데 쓴다 - _root_project_name 참고)
+        self.team_projects_by_id = {}     # company_projects_by_id와 같은 형식, 팀 레드마인용
+        # (할당된 일감/즐겨찾기 그룹의 최상위 프로젝트 구분자를 찾는 데 쓴다 -
+        # _root_project_name 참고)
 
-        self.redmine_user_id = redmine_api.load_redmine_user_id()
         self.my_issues = []
         self.favorites = redmine_api.load_favorites()
         self.favorite_issues = {}  # f"{source}:{id}" -> issues 리스트(처음엔 최근 200건)
         self.favorite_issue_totals = {}  # f"{source}:{id}" -> 전체 이슈 개수
-        # 배포 달력이 쓰는 버전 목록. None은 "아직 한 번도 안 불러옴"이고 []는 "불러왔는데
-        # 종료일 잡힌 버전이 없음"이라, 화면이 "불러오는 중"과 "없음"을 구분할 수 있어야
-        # 해서 굳이 나눠 둔다(_render_calendar 참고).
-        self.calendar_versions = None
+        # 배포 달력이 쓰는 버전 목록 - 디스크에 저장돼 있어 앱을 다시 켜도 남아있다
+        # (redmine_calendar_cache.json). None은 "아직 한 번도 못 받아옴"이고 []는
+        # "받아왔는데 종료일 잡힌 버전이 없음"이라, 화면이 "불러오는 중"과 "없음"을
+        # 구분할 수 있어야 해서 굳이 나눠 둔다(_render_calendar 참고).
+        self.calendar_versions = redmine_api.load_calendar_cache()
         # {프로젝트id(str): 그 프로젝트를 마지막으로 골랐을 때 받아온 결과} - 디스크에
         # 저장돼 있어 앱을 다시 켜도 남아있다. 패널을 열 때마다 레드마인 응답을 기다리지
         # 않고 이 캐시부터 보여준 뒤, 뒤에서 새로 받아와 갱신한다(get_resolved_by_version/
@@ -440,8 +473,8 @@ class App:
         self.resolved_by_version_cache = redmine_api.load_resolved_by_version_cache()
         self.team_progress_cache = redmine_api.load_team_progress_cache()
 
-        self.user_id_dialog = None
-        self._pending_my_issues_open = False  # 아이디 설정 후 "할당된 일감"을 이어서 열지 여부
+        self.api_key_dialog = None
+        self.api_key_dialog_kind = None  # "company" 또는 "team" - 지금 여는/열려 있는 창이 어느 쪽 키인지
         self.context_menu = None
 
         self.seen_issue_ids = redmine_api.load_seen_issues()  # 즐겨찾기별로 이미 알린 이슈 id
@@ -538,7 +571,7 @@ class App:
         # 지금 떠 있는 모든 창에 바로 적용한다 - pywebview의 on_top setter가 그 창의
         # TopMost를 즉시 바꿔주니(webview.window.Window.on_top 참고), 새로 여는 창까지
         # 기다릴 필요 없이 아이콘/패널/메뉴 전부 한 번에 뒤로(또는 다시 위로) 간다.
-        live_windows = [self.shell, self.context_menu, self.user_id_dialog, self.panel]
+        live_windows = [self.shell, self.context_menu, self.api_key_dialog, self.panel]
         live_windows += [win for _tid, win in self.toasts]
         for win in live_windows:
             if win is not None:
@@ -554,8 +587,8 @@ class App:
         # 그만큼 줄어서 아래쪽 항목이 잘린다 - 실제로 110% 화면에서 108px로 준 창의
         # 뷰포트가 99px까지 줄어 마지막 항목이 잘려 있었다.
         # 실측 필요 높이는 항목 하나당 35.2 + #win 위아래 패딩 6이다(항목 5개 -> 188.8).
-        # 항목을 추가하면 여기 높이도 항목당 36px씩 같이 늘려야 한다.
-        w, h = 200, 192
+        # 항목을 추가/제거하면 여기 높이도 항목당 36px씩 같이 조정해야 한다(항목 4개 -> 192 - 36).
+        w, h = 200, 156
         x = self.icon_x
         # y는 물리 픽셀이라 창이 실제로 차지하는 물리 높이(= CSS 높이 x 배율)를 빼야 한다.
         y = max(self.icon_y - _PANEL_ICON_GAP - round(h * _DPI_SCALE), 0)
@@ -594,14 +627,17 @@ class App:
             self.company_tree = redmine_api.build_project_tree(projects)
             if self.panel_kind == "company_tree":
                 self._push_tree()
-            elif self.panel_kind == "my_issues":
+            elif self.panel_kind in ("my_issues", "favorites"):
                 self._push_issues()  # 최상위 프로젝트 구분자를 이제서야 알았으면 다시 그린다
 
         def worker_team():
-            tree = redmine_api.build_project_tree(redmine_api.fetch_team_redmine_projects())
-            self.team_tree = tree
+            projects = redmine_api.fetch_team_redmine_projects()
+            self.team_projects_by_id = {p["id"]: p for p in projects}
+            self.team_tree = redmine_api.build_project_tree(projects)
             if self.panel_kind == "team_tree":
                 self._push_tree()
+            elif self.panel_kind == "favorites":
+                self._push_issues()  # 최상위 프로젝트 구분자를 이제서야 알았으면 다시 그린다
 
         threading.Thread(target=worker_company, daemon=True).start()
         threading.Thread(target=worker_team, daemon=True).start()
@@ -615,15 +651,14 @@ class App:
         이걸 직접 부르고, 나머지 호출부는 refresh_my_issues()로 스레드를 띄운다.
 
         notify=True면 지난번에 없던 일감을 토스트로 알린다(알림 루프에서만 켠다)."""
-        user_id = self.redmine_user_id or redmine_api.fetch_current_user_id()
-        issues = redmine_api.fetch_my_issues(user_id) if user_id else []
+        issues = redmine_api.fetch_my_issues()
         if issues is None:
             return  # 조회 실패 - 이번 회차는 건너뛰고 기존 목록/배지를 그대로 둔다
 
-        # 아이디를 아직 못 정했으면(user_id 없음) 목록이 빈 게 맞지만, 그걸 "일감이
-        # 사라졌다"고 기록해두면 나중에 아이디를 정한 순간 갖고 있던 일감이 전부
-        # 새 일감으로 보인다 - 믿을 수 있는 목록일 때만 알림 기준을 갱신한다.
-        if notify and user_id:
+        # API 키를 아직 설정 안 했으면 목록이 빈 게 맞지만, 그걸 "일감이 사라졌다"고
+        # 기록해두면 나중에 키를 넣은 순간 갖고 있던 일감이 전부 새 일감으로 보인다 -
+        # 믿을 수 있는 목록일 때만(키가 있을 때만) 알림 기준을 갱신한다.
+        if notify and redmine_api.load_redmine_api_key():
             self._notify_new_my_issues(issues)
 
         self.my_issues = issues
@@ -662,7 +697,7 @@ class App:
 
         threading.Thread(target=worker, daemon=True).start()
 
-    # ── 새 이슈 알림 (내 일감 + 즐겨찾기 프로젝트, 1분 주기) ──
+    # ── 새 이슈 알림 (내 일감 + 즐겨찾기 프로젝트, 기본 3분 주기) ──
     def start_notify_loop(self):
         def poll():
             # 내 일감을 먼저 본다 - 배지는 위젯을 접어놔도 늘 보이는 유일한 신호라
@@ -672,9 +707,15 @@ class App:
             self._check_new_issues()
 
         def loop():
-            poll()  # 시작하자마자 한 번 확인, 그 뒤로 주기적으로
+            # 이 위젯을 여러 사람이 같이 쓸 때(예: 출근 직후 자동 실행) 다들 같은
+            # 순간에 첫 요청을 보내지 않게, 시작 전에 무작위로 조금 기다린다. 그 뒤
+            # 주기에도 매번 지터를 더해서 시간이 지나도 여러 PC의 폴링이 한 박자로
+            # 안 맞춰지게 한다(config.NOTIFY_POLL_JITTER_MS 참고).
+            time.sleep(random.uniform(0, config.NOTIFY_POLL_JITTER_MS) / 1000)
+            poll()
             while True:
-                time.sleep(config.NOTIFY_POLL_INTERVAL_MS / 1000)
+                jitter = random.uniform(-config.NOTIFY_POLL_JITTER_MS, config.NOTIFY_POLL_JITTER_MS)
+                time.sleep(max(5, (config.NOTIFY_POLL_INTERVAL_MS + jitter) / 1000))
                 poll()
 
         threading.Thread(target=loop, daemon=True).start()
@@ -685,7 +726,13 @@ class App:
         favorites_snapshot = [f for f in self.favorites if f.get("notify", True)]
         if not favorites_snapshot:
             return
-        new_issues = []  # [(project_name, issue), ...]
+        # 레드마인은 project_id로 물으면 하위 프로젝트의 이슈까지 같이 돌려준다
+        # (redmine_api.fetch_recent_issues 설명 참고) - 최상위와 하위 프로젝트를 둘 다
+        # 즐겨찾기했으면 같은 이슈가 여러 즐겨찾기 조회에 다 걸려서, 그대로 두면 토스트가
+        # 그 즐겨찾기 개수만큼 중복으로 뜬다. issue_id를 키로 모아 이슈 하나당 토스트도
+        # 딱 하나만 뜨게 하고, 어느 즐겨찾기에서 걸렸는지가 아니라 이슈 자신의 project
+        # 값으로 "진짜 소속 프로젝트" 이름을 붙인다.
+        new_issues = {}  # issue_id -> issue
         updated = {}
         for fav in favorites_snapshot:
             source = fav.get("source", "company")
@@ -698,12 +745,13 @@ class App:
                 known_ids = set(known)
                 for issue in issues:
                     if issue["id"] not in known_ids:
-                        new_issues.append((fav["name"], issue))
+                        new_issues[issue["id"]] = issue
             # 처음 감시하는 프로젝트는 알림 없이 현재 이슈들만 "확인함"으로 기록
             updated[key] = [issue["id"] for issue in issues]
         self.seen_issue_ids.update(updated)
         redmine_api.save_seen_issues(self.seen_issue_ids)
-        for project_name, issue in new_issues:
+        for issue in new_issues.values():
+            project_name = issue.get("project") or "레드마인"
             self.show_toast(f"{project_name}  새 이슈", issue["subject"], issue["url"])
 
     def show_toast(self, heading, subject, url):
@@ -887,57 +935,72 @@ class App:
             redmine_api.save_favorites(self.favorites)
         return on
 
-    # ── "할당된 일감" 조회용 로그인 아이디 설정 ──────
-    def open_user_id_dialog(self):
-        if self.user_id_dialog is not None:
-            self.user_id_dialog.destroy()
-        # 우클릭 메뉴와 같은 이유로 CSS 픽셀 기준(open_context_menu 설명 참고) - 이 창도
-        # 110% 화면에서 아래쪽 버튼 줄이 잘려 있었다(필요 211px, 확보된 뷰포트 190px).
-        #
-        # 폭은 #desc가 <br>로 나눈 3줄이 그대로 한 줄씩 들어가는 값이다 - 가장 긴 줄이
-        # 실측 337.9px, #win 좌우 패딩이 32px라 370px부터 안 접힌다(그보다 좁으면 4줄로
-        # 접혀서 문장이 어정쩡하게 끊긴다). 높이는 그 3줄 기준 내용 높이 157.8px에
-        # 버튼 줄(30px)과 그 위 여백(16px, #win 패딩과 같게)을 더한 값이다 - #btnRow가
-        # flex:1이라 남는 높이를 먹고 버튼을 아래에 붙이니, 이 여백이 곧 입력칸과
-        # 버튼 사이 간격이 된다. 문구를 고치면 이 두 값도 다시 재야 한다.
-        w, h = 380, 204
+    # ── 전사/팀 레드마인 API 키 설정 ─────────────
+    # 나 혼자만 쓰는 위젯이 아니라서(레드마인 서버가 둘이라 API 키도 따로 필요하다),
+    # config.py 주석처럼 텍스트 파일을 직접 열어 붙여넣으라고 하는 대신 우클릭 메뉴 ->
+    # 팝업으로 누구나 키를 넣을 수 있게 한다.
+    _API_KEY_DIALOG_LABEL = {"company": "전사 레드마인", "team": "팀 레드마인"}
+
+    def open_api_key_dialog(self, kind):
+        if kind not in self._API_KEY_DIALOG_LABEL:
+            return
+        if self.api_key_dialog is not None:
+            self.api_key_dialog.destroy()
+        self.api_key_dialog_kind = kind
+        # 우클릭 메뉴와 같은 이유로 CSS 픽셀 기준(open_context_menu 설명 참고).
+        # 폭/높이는 #desc 2줄 안내문 + 입력칸/버튼 줄이 안 잘리게 잡은 값이다 -
+        # 문구를 고치면 이 값도 같이 재야 한다.
+        w, h = 380, 188
         x = self.icon_x
         y = max(self.icon_y - _PANEL_ICON_GAP - round(h * _DPI_SCALE), 0)
-        self.user_id_dialog = _create_window(
-            "user_id_dialog", html=bundle_html("user_id_dialog.html"),
+        self.api_key_dialog = _create_window(
+            "api_key_dialog", html=bundle_html("api_key_dialog.html"),
             width=w, height=h, x=x, y=y,
             frameless=True, on_top=self.always_on_top, resizable=False, shadow=False,
-            background_color=CARD_BG["user_id_dialog.html"],
+            background_color=CARD_BG["api_key_dialog.html"],
             easy_drag=False, min_size=(1, 1), js_api=Api(self),
             _round_corners=True, _scale_size=False,
         )
-        self.user_id_dialog.events.loaded += self._push_user_id
+        self.api_key_dialog.events.loaded += self._push_api_key_dialog
 
-    def _push_user_id(self):
-        if self.user_id_dialog is None:
+    def _push_api_key_dialog(self):
+        if self.api_key_dialog is None:
             return
-        data = json.dumps({"value": self.redmine_user_id or ""}, ensure_ascii=False)
-        self.user_id_dialog.evaluate_js(f"renderUserIdDialog({data})")
+        kind = self.api_key_dialog_kind
+        label = self._API_KEY_DIALOG_LABEL.get(kind, "")
+        value = (
+            redmine_api.load_redmine_api_key() if kind == "company"
+            else redmine_api.load_team_redmine_api_key()
+        ) or ""
+        data = json.dumps({
+            "title": f"{label} API 키 설정",
+            "desc": (
+                f"{label} 접속 후 오른쪽 위 계정 &gt; 개인 설정 페이지에서 API 키를<br>"
+                "발급받아 붙여넣으세요. 이 PC에 저장되며, 위젯을 쓰는 모두가 같은 키를 씁니다."
+            ),
+            "value": value,
+        }, ensure_ascii=False)
+        self.api_key_dialog.evaluate_js(f"renderApiKeyDialog({data})")
 
-    def close_user_id_dialog(self):
-        self._pending_my_issues_open = False
-        if self.user_id_dialog is not None:
-            self.user_id_dialog.destroy()
-            self.user_id_dialog = None
+    def close_api_key_dialog(self):
+        if self.api_key_dialog is not None:
+            self.api_key_dialog.destroy()
+            self.api_key_dialog = None
+        self.api_key_dialog_kind = None
 
-    def save_user_id(self, value):
+    def save_api_key(self, value):
         value = (value or "").strip()
-        if not value:
+        kind = self.api_key_dialog_kind
+        if not value or kind not in self._API_KEY_DIALOG_LABEL:
             return
-        self.redmine_user_id = value
-        redmine_api.save_redmine_user_id(value)
-        if self.user_id_dialog is not None:
-            self.user_id_dialog.destroy()
-            self.user_id_dialog = None
-        self.refresh_my_issues()
-        if self._pending_my_issues_open:
-            self._pending_my_issues_open = False
-            self.open_panel("my_issues")
+        if kind == "company":
+            redmine_api.save_redmine_api_key(value)
+        else:
+            redmine_api.save_team_redmine_api_key(value)
+        self.close_api_key_dialog()
+        self.refresh_trees()  # 방금 넣은 키로 바로 프로젝트 목록을 다시 받아온다
+        if kind == "company":
+            self.refresh_my_issues()  # "할당된 일감"도 전사 레드마인 API 키로만 조회된다
 
     # ── 패널 열기/닫기(토글) ──────────────────────
     def _panel_geometry(self, panel_w, panel_h):
@@ -961,18 +1024,10 @@ class App:
         if kind not in PANEL_SPEC:
             return
 
-        # 다른 화면을 여는 순간, 열려 있던 우클릭 메뉴와 아이디 설정 창은 닫는다.
-        # 이 창들은 항상 위(on_top)에 떠 있어서, 안 닫으면 새로 연 패널을 가린 채
-        # 남는다. 아래 my_issues 분기보다 먼저 해야 한다 - close_user_id_dialog가
-        # _pending_my_issues_open을 지우기 때문에, 순서가 바뀌면 아이디를 저장한 뒤
-        # "할당된 일감"이 이어서 열리지 않는다.
+        # 다른 화면을 여는 순간, 열려 있던 우클릭 메뉴/API 키 설정 창은 닫는다. 이
+        # 창들은 항상 위(on_top)에 떠 있어서, 안 닫으면 새로 연 패널을 가린 채 남는다.
         self.close_context_menu()
-        self.close_user_id_dialog()
-
-        if kind == "my_issues" and not self.redmine_user_id:
-            self._pending_my_issues_open = True
-            self.open_user_id_dialog()
-            return
+        self.close_api_key_dialog()
 
         if self.panel is not None:
             was_same = self.panel_kind == kind
@@ -1062,6 +1117,18 @@ class App:
         redmine_api.save_resolved_by_version_cache(self.resolved_by_version_cache)
         return result
 
+    def refresh_resolved_by_version(self, project_id):
+        """화면 안 새로고침 아이콘이 부른다 - get_resolved_by_version처럼 캐시부터
+        돌려주고 기다리는 대신, 지금 고른 프로젝트를 곧바로 다시 받아와 화면을 갱신한다
+        (_refresh_resolved_by_version이 다 받아오면 evaluate_js로 밀어준다)."""
+        project_id = int(project_id)
+        targets = self._resolved_targets(project_id)
+        if not targets:
+            return
+        threading.Thread(
+            target=self._refresh_resolved_by_version, args=(project_id, targets), daemon=True,
+        ).start()
+
     def _resolved_targets(self, project_id):
         """project_id 노드를 트리에서 찾아 자기 자신 + 모든 하위 프로젝트를
         [(id, name), ...]로 평평하게 돌려준다(고른 게 최상위면 하위 전부, 이미 말단
@@ -1141,9 +1208,12 @@ class App:
         대해서만 depth 2로 나눠 보여준다. depth 2 자식이 없는 팀/프로젝트는 자기 자신
         하나를 그 depth 2 그룹으로 취급한다.
         반환 형식: [{"team": str, "team_id": int,
-                     "subgroups": [{"team": str, "team_id": int, "versions": [...]}, ...]},
+                     "subgroups": [{"team": str, "team_id": int, "is_subproject": bool,
+                                     "versions": [...]}, ...]},
                     ...]
-        (subgroups 안의 "versions"는 fetch_team_progress 반환값과 동일)
+        (subgroups 안의 "versions"는 fetch_team_progress 반환값과 동일. is_subproject가
+        False면 depth 2 자식이 없어 팀 자신을 그룹으로 대신 쓴 것이라, "team" 이름이
+        위 팀 이름과 똑같다 - team_progress.js가 이때 뱃지를 안 그린다)
 
         캐시(self.team_progress_cache)에 이 프로젝트 결과가 있으면 레드마인을 새로
         묻지 않고 그걸 바로 돌려주고, 최신 데이터는 뒤에서 조용히 받아와 갱신한다
@@ -1167,6 +1237,18 @@ class App:
         redmine_api.save_team_progress_cache(self.team_progress_cache)
         return result
 
+    def refresh_team_progress(self, project_id):
+        """화면 안 새로고침 아이콘이 부른다 - get_team_progress처럼 캐시부터 돌려주고
+        기다리는 대신, 지금 고른 조직/팀을 곧바로 다시 받아와 화면을 갱신한다
+        (_refresh_team_progress가 다 받아오면 evaluate_js로 밀어준다)."""
+        project_id = int(project_id)
+        team_nodes = self._team_progress_nodes(project_id)
+        if team_nodes is None:
+            return
+        threading.Thread(
+            target=self._refresh_team_progress, args=(project_id, team_nodes), daemon=True,
+        ).start()
+
     def _team_progress_nodes(self, project_id):
         """project_id로 고른 노드가 최상위(루트)면 그 depth 1 자식들을, 팀 자신(depth 1)
         이면 그 하나만 담은 리스트를 돌려준다(get_team_progress 설명 참고). 트리에
@@ -1184,16 +1266,22 @@ class App:
         # 팀(depth 1)마다 순서대로 조회하면 팀 개수만큼 시간이 곱해져 너무 느려지므로,
         # 모든 팀의 depth 2 자식을 한 평평한 목록으로 모아 한 번에 조회한 뒤 팀별로
         # 다시 묶는다.
-        flat = []  # [(project_id, name, team_index), ...]
+        flat = []  # [(project_id, name, team_index, is_subproject), ...]
         for team_index, team_node in enumerate(team_nodes):
-            sub_children = team_node.get("children") or [team_node]
-            for c in sub_children:
-                flat.append((c["id"], c["name"], team_index))
+            children = team_node.get("children") or []
+            # depth 2 자식이 없는 팀은 자기 자신 하나를 그 depth 2 그룹으로 취급한다
+            # (get_team_progress 설명 참고) - 이때는 subgroup의 "team" 이름이 위에
+            # 이미 붙는 team-heading과 똑같아지므로, is_subproject를 False로 표시해서
+            # JS 쪽이 중복되는 뱃지를 안 그리게 한다(team_progress.js renderSubgroup 참고).
+            is_subproject = bool(children)
+            for c in (children or [team_node]):
+                flat.append((c["id"], c["name"], team_index, is_subproject))
 
-        flat_results = redmine_api.fetch_org_progress([(pid, name) for pid, name, _ in flat])
+        flat_results = redmine_api.fetch_org_progress([(pid, name) for pid, name, _, _ in flat])
 
         result = [{"team": t["name"], "team_id": t["id"], "subgroups": []} for t in team_nodes]
-        for (_pid, _name, team_index), r in zip(flat, flat_results):
+        for (_pid, _name, team_index, is_subproject), r in zip(flat, flat_results):
+            r["is_subproject"] = is_subproject
             result[team_index]["subgroups"].append(r)
         return result
 
@@ -1226,6 +1314,7 @@ class App:
             (f["id"], f["name"], f.get("source", "company")) for f in self.favorites
         ]
         self.calendar_versions = redmine_api.fetch_calendar_versions(pairs)
+        redmine_api.save_calendar_cache(self.calendar_versions)
         if self.panel_kind == "deploy_calendar":
             self._render_calendar()
 
@@ -1285,16 +1374,18 @@ class App:
         )
         self.panel.evaluate_js(f"renderIssuesPanel({data})")
 
-    def _root_project_name(self, project_id):
-        """company_projects_by_id의 parent_id를 타고 올라가 최상위 프로젝트 이름을
-        찾는다. 아직 프로젝트 목록을 못 받았거나(company_projects_by_id 비어있음)
-        모르는 project_id면 None을 돌려준다 - 호출부에서 그룹 이름으로 대신 채운다."""
-        node = self.company_projects_by_id.get(project_id)
+    def _root_project_name(self, project_id, source="company"):
+        """company_projects_by_id/team_projects_by_id의 parent_id를 타고 올라가
+        최상위 프로젝트 이름을 찾는다. 그 프로젝트 자신이 이미 최상위거나, 아직
+        트리를 못 받았거나(비어있음), 모르는 project_id면 None을 돌려준다 - 호출부에서
+        그룹 이름으로 대신 채운다."""
+        projects_by_id = self.team_projects_by_id if source == "team" else self.company_projects_by_id
+        node = projects_by_id.get(project_id)
         if node is None:
             return None
         seen = set()
         while node.get("parent_id") is not None and node["parent_id"] not in seen:
-            parent = self.company_projects_by_id.get(node["parent_id"])
+            parent = projects_by_id.get(node["parent_id"])
             if parent is None:
                 break
             seen.add(node["parent_id"])
@@ -1328,8 +1419,17 @@ class App:
             source = f.get("source", "company")
             key = f"{source}:{f['id']}"
             issues = self.favorite_issues.get(key, [])
+            # _root_project_name은 이 프로젝트 자신이 이미 최상위면 자기 이름을 그대로
+            # 돌려준다("할당된 일감" 쪽은 그래야 항상 구분자가 있다) - 즐겨찾기는 그 경우
+            # 카드 이름과 겹치는 구분자를 또 넣을 필요가 없어서 여기서 None으로 걸러낸다.
+            root = self._root_project_name(f["id"], source)
+            parent = root if root and root != f["name"] else None
             return {
                 "project": f["name"],
+                # 최상위 프로젝트가 다르면 카드 목록에서 그 이름으로 작은 구분자를 하나
+                # 더 넣는다("전사/팀 레드마인" 구분자 안쪽에서 한 단계 더 - issues_panel.js
+                # renderLeft 참고). 이 프로젝트 자신이 최상위면 구분자 없이 카드만 보여준다.
+                "parent": parent,
                 "issues": issues,
                 "section": SECTION_LABEL.get(source, source),
                 "_order": SECTION_ORDER.get(source, 99),
@@ -1340,7 +1440,10 @@ class App:
                 "total": self.favorite_issue_totals.get(key, len(issues)),
             }
 
-        groups = sorted((to_group(f) for f in self.favorites), key=lambda g: (g["_order"], g["project"]))
+        groups = sorted(
+            (to_group(f) for f in self.favorites),
+            key=lambda g: (g["_order"], g["parent"] or g["project"], g["project"]),
+        )
         for g in groups:
             del g["_order"]
         return groups

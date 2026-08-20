@@ -7,7 +7,7 @@
 // 각 팀은 다시 그 팀의 depth 2 자식 프로젝트별로 나뉜 subgroups를 갖는다(예:
 // "MCX솔루션 개발팀" 밑의 "국내 프로젝트"/"해외 프로젝트"처럼 성격이 다른 프로젝트가
 // 섞여 있어서 - main.py App.get_team_progress 설명 참고):
-// [{"team":, "team_id":, "subgroups": [{"team":, "team_id":, "versions":[...]}, ...]}, ...]
+// [{"team":, "team_id":, "subgroups": [{"team":, "team_id":, "is_subproject":, "versions":[...]}, ...]}, ...]
 // 팀마다 섹션을, 그 안에 depth 2 프로젝트마다 구분자를 넣은 소그룹을 그린다.
 // 이 화면은 "무엇이 진행 중인지" 간트차트로만 훑어보는 용도라 일감 목록/진행률 막대/
 // 클릭 상호작용은 없다.
@@ -15,6 +15,14 @@ let selectedTeamRow = null;
 let selectedProjectId = null;  // 지금 오른쪽에 펼쳐놓은 조직/팀의 id - updateOrgCol이 그 사이
                                 // 다른 걸 골랐으면(불일치) 백그라운드 새로고침 결과를 버리는 데 쓴다
 let loadToken = 0;
+
+// 새로고침 아이콘 - 지금 고른 조직/팀을 캐시 없이 곧바로 다시 받아온다. 아직 고른 게
+// 없으면(selectedProjectId 없음) 할 일이 없으니 조용히 무시한다.
+document.getElementById("refreshBtn").addEventListener("click", () => {
+    if (selectedProjectId != null) {
+        window.pywebview.api.refresh_team_progress(selectedProjectId);
+    }
+});
 
 function renderTeamProgressPanel(data) {
     const col = document.getElementById("colTeam");
@@ -170,10 +178,15 @@ function renderSubgroup(sub) {
     const wrap = document.createElement("div");
     wrap.className = "subgroup";
 
-    const heading = document.createElement("div");
-    heading.className = "subgroup-heading";
-    heading.textContent = sub.team;
-    wrap.appendChild(heading);
+    // depth 2 자식이 없는 팀은 파이썬이 팀 자신을 이 그룹으로 대신 채워서
+    // sub.team이 위 team-heading과 똑같은 이름이 된다(main.py _fetch_team_progress
+    // 참고) - 그 경우 뱃지를 또 붙이면 같은 이름이 중복으로 보이니 생략한다.
+    if (sub.is_subproject) {
+        const heading = document.createElement("div");
+        heading.className = "subgroup-heading";
+        heading.textContent = sub.team;
+        wrap.appendChild(heading);
+    }
 
     wrap.appendChild(renderGanttHeader(thisYear));
     ganttGroups.forEach((group) => wrap.appendChild(renderGanttRow(group, thisYear)));

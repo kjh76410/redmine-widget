@@ -148,16 +148,57 @@ html, body {
     min-height: 0;
 }
 
-/* 헤더가 없어서 창 맨 위부터 시작한다 - 둥근 모서리에 안 닿게 위쪽 여백을 준다.
-   너비는 "레드마인(150)"/"레드마인(20)" 트리 창(panel.html, 300px)과 같게 맞춘다 -
-   px이 아니라 비율로 적는 이유: 이 창은 1100으로 잡혀 있는데(main.py PANEL_SPEC)
-   같은 DPI 배율로 나뉘어 CSS 픽셀이 되므로, 비율로 두면 어떤 화면 배율에서도
-   실제 폭이 같아진다. */
-#left {
+/* 왼쪽 프로젝트 목록을 헤더(#leftHeader) + 목록(#left)으로 세로로 나눠 감싸는 영역
+   (resolved_panel.html의 #colProjectWrap과 같은 구조). 너비는 "레드마인(150)"/
+   "레드마인(20)" 트리 창(panel.html, 300px)과 같게 맞춘다 - px이 아니라 비율로 적는
+   이유: 이 창은 1100으로 잡혀 있는데(main.py PANEL_SPEC) 같은 DPI 배율로 나뉘어
+   CSS 픽셀이 되므로, 비율로 두면 어떤 화면 배율에서도 실제 폭이 같아진다. */
+#leftWrap {
     width: calc(100% * 300 / 1100);
     min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 제목("할당된 일감"/"즐겨찾기 프로젝트") + 새로고침 아이콘 - 둥근 모서리에 안 닿게
+   위쪽 여백은 여기서 준다(#left는 그 아래서 시작하니 자기 몫은 없다). */
+#leftHeader {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 10px 4px;
+}
+
+#leftTitle {
+    color: #152340;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+/* 검색란 돋보기(#searchBtn)와 같은 마스크 방식 - 창 강조색이 바뀌어도 아이콘 색이
+   그대로 맞는다. */
+#refreshBtn {
+    width: 13px;
+    height: 13px;
+    min-width: 13px;
+    background: #5A6B85;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z'/%3E%3C/svg%3E");
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: contain;
+    cursor: pointer;
+}
+
+#refreshBtn:hover {
+    background: #152340;
+}
+
+#left {
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
-    padding: 10px 8px 12px;
+    padding: 0 8px 12px;
 }
 
 #divider {
@@ -220,6 +261,16 @@ html, body {
 .section-bell.off {
     border-color: #D7DBE2;
     color: #A5ADBA;
+}
+
+/* 즐겨찾기 프로젝트의 최상위 프로젝트 구분자 - .section(레드마인 구분) 안쪽에서 한
+   단계 더 묶는 용도라, 종/버튼 없이 글자만 더 흐리고 작게 둬서 위 구분자와 눈에
+   띄게 구별한다. */
+.sub-section {
+    color: #8E9AAE;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 6px 6px 2px;
 }
 
 .project-card {

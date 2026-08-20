@@ -100,16 +100,16 @@ html, body {
    (resolved_panel.js의 renderVersionsGroupedByProject 참고). */
 .project-section.with-divider {
     border-top: 1px solid #CED4DA;
-    margin-top: 16px;
-    padding-top: 10px;
+    margin-top: 8px;
+    padding-top: 6px;
 }
 
 .project-heading {
     color: #152340;
     font-size: 13px;
     font-weight: 700;
-    padding: 2px 0 10px 10px;
-    margin-bottom: 2px;
+    padding: 1px 0 4px 8px;
+    margin-bottom: 0;
     border-left: 3px solid #152340;
 }
 
@@ -123,6 +123,24 @@ html, body {
     color: #152340;
     font-size: 12px;
     font-weight: 700;
+}
+
+/* 버전 목록 행만 - 종료일을 요일까지 다 쓰는 형식(YYYY-MM-DD (요일))으로 바꾸면서
+   한 줄에 버전명까지 넣기엔 좁아졌다(renderVersionRow 참고) - 위 줄(.row-top)엔
+   종료일 + 진행률, 아래 줄(.label)엔 버전명을 둔다. 프로젝트 칸(트리 행)의 .row는
+   그대로 한 줄이라 이 규칙의 영향을 안 받는다. */
+.row.version-row {
+    flex-direction: column;
+    align-items: stretch;
+    height: auto;
+    padding: 6px 10px;
+    gap: 4px;
+}
+
+.row-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .row:hover {
@@ -142,12 +160,10 @@ html, body {
     flex: none;
 }
 
-/* 버전 종료일 뱃지 - 버전명 앞에 붙는다. 개수 뱃지(.count)와 달리 테두리만 있는
-   옅은 형태로 둔다 - 같은 행에 진한 뱃지가 둘이면 정작 중요한 개수가 안 보인다. */
+/* 버전 종료일 뱃지 - .row-top 왼쪽. 개수 뱃지(.count)와 달리 테두리만 있는 옅은
+   형태로 둔다 - 같은 줄에 진한 뱃지가 둘이면 정작 중요한 진행률이 안 보인다. */
 .row .due {
     flex: none;
-    min-width: 58px;  /* "26.08.19" 한 벌 너비 - 날짜가 없는 행도 이만큼은 비워둔다 */
-    margin-right: 8px;
     padding: 1px 6px;
     border-radius: 6px;
     border: 1px solid #CED4DA;
@@ -158,7 +174,8 @@ html, body {
     white-space: nowrap;
 }
 
-/* 종료일이 없는 버전 - 자리만 잡고 아무것도 안 보이게 */
+/* 종료일이 없는 버전 - 자리만 잡고 아무것도 안 보이게(오른쪽 진행률 뱃지는
+   .row-top의 space-between이 항상 오른쪽 끝에 붙여주니 자리 계산은 필요 없다) */
 .row .due.none {
     border-color: transparent;
 }
@@ -223,6 +240,26 @@ html, body {
        .year-badge 한 줄 20px)만큼은 비워 둔다 - 안 그러면 배지가 생기고 사라질
        때마다 #badgeRow 높이가 바뀌면서 그 아래 목록(#cols)이 위아래로 들썩인다. */
     min-height: 36px;
+}
+
+/* 일감 칸(#badgeIssue)은 원래 늘 비어 있던 자리라(위 설명 참고), 여기에 새로고침
+   아이콘을 넣는다 - margin-left:auto로 이 칸 오른쪽 끝에 붙는다. 지금 고른 프로젝트를
+   다시 받아온다(resolved_panel.js 참고, 프로젝트를 아직 안 골랐으면 아무 일도 안 함). */
+#refreshBtn {
+    width: 13px;
+    height: 13px;
+    min-width: 13px;
+    margin-left: auto;
+    background: #5A6B85;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z'/%3E%3C/svg%3E");
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: contain;
+    cursor: pointer;
+}
+
+#refreshBtn:hover {
+    background: #152340;
 }
 
 .year-badge {

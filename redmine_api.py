@@ -11,11 +11,11 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from config import (
+    CALENDAR_CACHE_FILE,
     FAVORITES_FILE,
     REDMINE_API_KEY_FILE,
     REDMINE_API_KEY_PLACEHOLDER,
     REDMINE_BASE_URL,
-    REDMINE_USER_ID_FILE,
     RESOLVED_BY_VERSION_CACHE_FILE,
     SEEN_ISSUES_FILE,
     TEAM_PROGRESS_CACHE_FILE,
@@ -39,23 +39,20 @@ def load_team_redmine_api_key():
     return key or None
 
 
+def save_redmine_api_key(value):
+    REDMINE_API_KEY_FILE.write_text(value.strip(), encoding="utf-8")
+
+
+def save_team_redmine_api_key(value):
+    TEAM_REDMINE_API_KEY_FILE.write_text(value.strip(), encoding="utf-8")
+
+
 def redmine_server(source):
     """즐겨찾기 프로젝트의 출처("company"=전사 레드마인, "team"=팀 레드마인)에 맞는
     (base_url, api_key)를 돌려준다. 두 서버가 별도 API 키를 쓰기 때문에 필요하다."""
     if source == "team":
         return TEAM_REDMINE_BASE_URL, load_team_redmine_api_key()
     return REDMINE_BASE_URL, load_redmine_api_key()
-
-
-def load_redmine_user_id():
-    if not REDMINE_USER_ID_FILE.exists():
-        return None
-    value = REDMINE_USER_ID_FILE.read_text(encoding="utf-8").strip()
-    return value or None
-
-
-def save_redmine_user_id(value):
-    REDMINE_USER_ID_FILE.write_text(value, encoding="utf-8")
 
 
 def fetch_redmine_projects():
@@ -133,8 +130,14 @@ def fetch_team_redmine_projects():
 
 
 def fetch_recent_issues(project_id, source="company"):
-    """레드마인 REST API로 특정 프로젝트의 최근 이슈 목록(id, 제목, url)을 가져온다.
-    source로 전사/팀 레드마인 중 어느 서버에서 가져올지 정한다.
+    """레드마인 REST API로 특정 프로젝트의 최근 이슈 목록(id, 제목, url, 소속 프로젝트명)을
+    가져온다. source로 전사/팀 레드마인 중 어느 서버에서 가져올지 정한다.
+
+    project_id만 주고 물으면 레드마인이 그 프로젝트뿐 아니라 하위 프로젝트의 이슈까지
+    같이 돌려준다(subproject_id로 좁히지 않음) - 그래서 각 이슈가 실제로 어느 프로젝트
+    소속인지("project")를 같이 담아 돌려준다. 최상위와 하위 프로젝트를 둘 다 즐겨찾기해
+    같은 이슈가 양쪽 조회에 다 걸리는 경우(main.py의 App._check_new_issues 참고), 이
+    project 값으로 "진짜 소속 프로젝트" 이름을 토스트에 붙일 수 있다.
     실패/미설정 시 None을 반환(빈 목록과 구분해 이번 회차는 건너뛰기 위함)."""
     base_url, api_key = redmine_server(source)
     if not api_key:
@@ -156,6 +159,7 @@ def fetch_recent_issues(project_id, source="company"):
             "id": i.get("id"),
             "subject": i.get("subject", ""),
             "url": f"{base_url}/issues/{i.get('id')}",
+            "project": i.get("project", {}).get("name", ""),
         }
         for i in data.get("issues", [])
     ]
@@ -181,54 +185,23 @@ def fetch_current_user_id():
     return str(user_id) if user_id is not None else None
 
 
-def resolve_user_id(identifier):
-    """identifier가 이미 숫자(사용자 ID)면 그대로 반환하고, 로그인 아이디(문자)면
-    레드마인 사용자 검색 API로 실제 로그인이 일치하는 사용자를 찾아 숫자 ID로 변환한다.
-    (레드마인 설정에 따라 일반 계정은 사용자 검색 권한이 없을 수도 있다) 실패 시 None."""
-    identifier = identifier.strip()
-    if identifier.isdigit():
-        return identifier
-
-    api_key = load_redmine_api_key()
-    if not api_key:
-        return None
-
-    url = f"{REDMINE_BASE_URL}/users.json?name={urllib.parse.quote(identifier)}&limit=25"
-    req = urllib.request.Request(url, headers={"X-Redmine-API-Key": api_key})
-    try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.load(resp)
-    except (urllib.error.URLError, OSError, ValueError):
-        return None
-
-    users = data.get("users", [])
-    for u in users:
-        if u.get("login") == identifier:
-            return str(u.get("id"))
-    if len(users) == 1:
-        return str(users[0].get("id"))
-    return None
-
-
-def fetch_my_issues(identifier):
-    """레드마인 REST API로 identifier(로그인 아이디 또는 숫자 ID)에게 할당된
-    이슈 목록(id 내림차순)을 가져온다. 상태가 "완료"인 이슈는 목록에서 제외한다.
-    identifier가 없으면(아직 설정 전) 빈 리스트를 반환.
+def fetch_my_issues():
+    """레드마인 REST API로 API 키 계정("나") 자신에게 할당된 이슈 목록(id 내림차순)을
+    가져온다. 상태가 "완료"인 이슈는 목록에서 제외한다. API 키가 아직 없으면(설정 전)
+    빈 리스트를 반환한다.
 
     조회에 실패하면 fetch_recent_issues와 같이 None을 반환한다 - 빈 목록과 꼭
     구분해야 한다. 잠깐의 실패를 "할당된 일감 없음"으로 받아들이면 배지가 0으로
     깜빡일 뿐 아니라, 알림 기준이 되는 "이미 본 일감" 목록까지 비워져서 다음
     회차에 갖고 있던 일감 전부가 새로 할당된 것처럼 토스트로 쏟아진다
     (main.py의 _notify_new_my_issues 참고)."""
-    if not identifier:
-        return []
     api_key = load_redmine_api_key()
     if not api_key:
-        return None
+        return []
 
-    user_id = resolve_user_id(identifier)
+    user_id = fetch_current_user_id()
     if not user_id:
-        return None  # 아이디 조회 자체가 HTTP 호출이라, 일시적인 실패일 수 있다
+        return None  # 계정 조회 자체가 HTTP 호출이라, 일시적인 실패일 수 있다
 
     url = (
         f"{REDMINE_BASE_URL}/issues.json"
@@ -531,45 +504,57 @@ def fetch_calendar_versions(pairs):
     목록으로 돌려준다(종료일 없는 버전은 달력에 찍을 자리가 없어 아예 뺀다).
     조회에 실패한 프로젝트는 조용히 건너뛴다 - 달력은 일부만이라도 보이는 게
     통째로 비는 것보다 낫다.
+
+    프로젝트마다 순서대로 조회하면 즐겨찾기 개수만큼 시간이 곱해져 느려지므로,
+    fetch_issues_by_version과 같은 방식으로 몇 개씩 동시에 물어서 기다리는 시간을 줄인다.
     반환 형식: [{"version_id":, "version":, "project":, "project_id":, "source":,
                  "due_date":, "status": "open"/"locked"/"closed", "url":}, ...]"""
     rows = []
-    for project_id, project_name, source in pairs:
-        base_url, api_key = redmine_server(source)
-        if not api_key:
-            continue
-
-        url = f"{base_url}/projects/{project_id}/versions.json"
-        req = urllib.request.Request(url, headers={"X-Redmine-API-Key": api_key})
-        try:
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.load(resp)
-        except (urllib.error.URLError, OSError, ValueError):
-            continue
-
-        for v in data.get("versions", []):
-            # /projects/:id/versions.json은 이 프로젝트가 만든 버전뿐 아니라, 공유
-            # 범위(sharing)가 "모든 프로젝트"인 다른 프로젝트의 버전까지 같이 돌려준다.
-            # 그대로 쓰면 즐겨찾기한 프로젝트마다 같은 버전이 중복으로(그것도 엉뚱한
-            # project_name을 달고) 찍히니, 실제로 그 버전을 만든 프로젝트일 때만 담는다.
-            owner_id = (v.get("project") or {}).get("id")
-            if owner_id is not None and owner_id != project_id:
-                continue
-            due_date = v.get("due_date")
-            if not due_date:
-                continue
-            rows.append({
-                "version_id": v.get("id"),
-                "version": v.get("name", ""),
-                "project": project_name,
-                "project_id": project_id,
-                "source": source,
-                "due_date": due_date,
-                "status": v.get("status", "open"),
-                "url": f"{base_url}/versions/{v.get('id')}",
-            })
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futures = [pool.submit(_fetch_calendar_versions_for_project, pair) for pair in pairs]
+        for future in as_completed(futures):
+            rows.extend(future.result())
 
     rows.sort(key=lambda r: (r["due_date"], r["project"], r["version"]))
+    return rows
+
+
+def _fetch_calendar_versions_for_project(pair):
+    project_id, project_name, source = pair
+    base_url, api_key = redmine_server(source)
+    if not api_key:
+        return []
+
+    url = f"{base_url}/projects/{project_id}/versions.json"
+    req = urllib.request.Request(url, headers={"X-Redmine-API-Key": api_key})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.load(resp)
+    except (urllib.error.URLError, OSError, ValueError):
+        return []
+
+    rows = []
+    for v in data.get("versions", []):
+        # /projects/:id/versions.json은 이 프로젝트가 만든 버전뿐 아니라, 공유
+        # 범위(sharing)가 "모든 프로젝트"인 다른 프로젝트의 버전까지 같이 돌려준다.
+        # 그대로 쓰면 즐겨찾기한 프로젝트마다 같은 버전이 중복으로(그것도 엉뚱한
+        # project_name을 달고) 찍히니, 실제로 그 버전을 만든 프로젝트일 때만 담는다.
+        owner_id = (v.get("project") or {}).get("id")
+        if owner_id is not None and owner_id != project_id:
+            continue
+        due_date = v.get("due_date")
+        if not due_date:
+            continue
+        rows.append({
+            "version_id": v.get("id"),
+            "version": v.get("name", ""),
+            "project": project_name,
+            "project_id": project_id,
+            "source": source,
+            "due_date": due_date,
+            "status": v.get("status", "open"),
+            "url": f"{base_url}/versions/{v.get('id')}",
+        })
     return rows
 
 
@@ -754,3 +739,26 @@ def load_team_progress_cache():
 
 def save_team_progress_cache(cache):
     _save_json_cache(TEAM_PROGRESS_CACHE_FILE, cache)
+
+
+def load_calendar_cache():
+    """배포 달력이 마지막으로 받아온 결과 - "버전별 연결된 일감"/"팀별 진행상황"과
+    달리 프로젝트별로 나누지 않고 즐겨찾기 전체를 한 번에 다루므로 리스트 하나만
+    저장한다. 파일이 없으면(한 번도 저장한 적 없음) None을 돌려줘서, 빈 리스트("배포
+    예정 없음"으로 이미 확인됨)와 구분한다 - main.py의 App._render_calendar가 이
+    구분으로 "불러오는 중"과 "없음"을 가른다."""
+    if not CALENDAR_CACHE_FILE.exists():
+        return None
+    try:
+        with open(CALENDAR_CACHE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def save_calendar_cache(versions):
+    try:
+        with open(CALENDAR_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(versions, f, ensure_ascii=False, indent=2)
+    except OSError:
+        pass

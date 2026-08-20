@@ -2,6 +2,10 @@
 // favorites: ["company:5", "team:12", ...] 형태의 즐겨찾기 키 목록.
 let favSet = new Set();
 
+document.getElementById("refreshBtn").addEventListener("click", () => {
+    window.pywebview.api.refresh_redmine();
+});
+
 function renderPanel(data) {
     document.getElementById("title").textContent = data.title;
     favSet = new Set(data.favorites || []);

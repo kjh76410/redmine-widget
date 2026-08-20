@@ -1,0 +1,672 @@
+[
+  {
+    "version_id": 1,
+    "version": "PTA_2024-03-08",
+    "project": "PTA",
+    "project_id": 38,
+    "source": "company",
+    "due_date": "2024-03-08",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/1"
+  },
+  {
+    "version_id": 2,
+    "version": "PTA_2024-03-29",
+    "project": "PTA",
+    "project_id": 38,
+    "source": "company",
+    "due_date": "2024-03-29",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/2"
+  },
+  {
+    "version_id": 4,
+    "version": "[재난망][개발용]KT 단말 규격 v1.2.1",
+    "project": "MCPTT",
+    "project_id": 147,
+    "source": "company",
+    "due_date": "2024-05-17",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/4"
+  },
+  {
+    "version_id": 9,
+    "version": "[재난망][QA검증용]KT 단말 규격 v1.2.1",
+    "project": "MCPTT",
+    "project_id": 147,
+    "source": "company",
+    "due_date": "2024-05-31",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/9"
+  },
+  {
+    "version_id": 10,
+    "version": "PTA_06_28",
+    "project": "PTA",
+    "project_id": 38,
+    "source": "company",
+    "due_date": "2024-06-28",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/10"
+  },
+  {
+    "version_id": 12,
+    "version": "[재난망][소방][개발용]MCPTT 표준화 UI/UX Client 개발 ",
+    "project": "MCPTT",
+    "project_id": 147,
+    "source": "company",
+    "due_date": "2024-09-30",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/12"
+  },
+  {
+    "version_id": 16,
+    "version": "[재난망][육군 KCMVP] Client 개발",
+    "project": "MCPTT",
+    "project_id": 147,
+    "source": "company",
+    "due_date": "2024-09-30",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/16"
+  },
+  {
+    "version_id": 22,
+    "version": "[GC23SP1] 스웨덴_MSB",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2024-10-11",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/22"
+  },
+  {
+    "version_id": 23,
+    "version": "[I&V] GC23SP1",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2024-10-11",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/23"
+  },
+  {
+    "version_id": 27,
+    "version": "[Vodafeon] VOC 수정 버전",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2024-10-15",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/27"
+  },
+  {
+    "version_id": 18,
+    "version": "[재난망][육군 KCMVP] QA 검증용",
+    "project": "MCPTT",
+    "project_id": 147,
+    "source": "company",
+    "due_date": "2024-10-18",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/18"
+  },
+  {
+    "version_id": 30,
+    "version": "PTA_Patch(2024-10-31)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2024-10-31",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/30"
+  },
+  {
+    "version_id": 29,
+    "version": "PreFAT_2024-10-31",
+    "project": "PTA",
+    "project_id": 38,
+    "source": "company",
+    "due_date": "2024-10-31",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/29"
+  },
+  {
+    "version_id": 31,
+    "version": "NCRTC VOC CLient(2024-11-06)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2024-11-06",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/31"
+  },
+  {
+    "version_id": 34,
+    "version": "450Connect_Drop(2024-11-15)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2024-11-15",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/34"
+  },
+  {
+    "version_id": 36,
+    "version": "PTA_FAT_Drop4(2024-11-29)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2024-11-29",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/36"
+  },
+  {
+    "version_id": 37,
+    "version": "PTA_FAT_Drop4(2024-11-29)",
+    "project": "PTA",
+    "project_id": 38,
+    "source": "company",
+    "due_date": "2024-11-29",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/37"
+  },
+  {
+    "version_id": 19,
+    "version": "[소방][QA 검증용]",
+    "project": "MCPTT",
+    "project_id": 147,
+    "source": "company",
+    "due_date": "2024-11-30",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/19"
+  },
+  {
+    "version_id": 154,
+    "version": "2024년 FOTA (2024-12-05) - JA10 배포X",
+    "project": "재난안전통신망",
+    "project_id": 80,
+    "source": "company",
+    "due_date": "2024-12-05",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/154"
+  },
+  {
+    "version_id": 39,
+    "version": "스웨덴_MSB",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2024-12-23",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/39"
+  },
+  {
+    "version_id": 42,
+    "version": " [Vodafone] VOC 수정 버전 (2025-01-16)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2025-01-16",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/42"
+  },
+  {
+    "version_id": 46,
+    "version": "LM75C.JB05",
+    "project": "450 Connect",
+    "project_id": 17,
+    "source": "company",
+    "due_date": "2025-02-07",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/46"
+  },
+  {
+    "version_id": 47,
+    "version": "LM75C_PGE.JB04",
+    "project": "450 Connect",
+    "project_id": 17,
+    "source": "company",
+    "due_date": "2025-02-07",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/47"
+  },
+  {
+    "version_id": 45,
+    "version": "PTA_FAT_Drop5(2025-02-14)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2025-02-14",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/45"
+  },
+  {
+    "version_id": 38,
+    "version": "PTA_FAT_Drop5 (2025)",
+    "project": "PTA",
+    "project_id": 38,
+    "source": "company",
+    "due_date": "2025-02-14",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/38"
+  },
+  {
+    "version_id": 44,
+    "version": "2025-02-20_Release",
+    "project": "450 Connect",
+    "project_id": 17,
+    "source": "company",
+    "due_date": "2025-02-20",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/44"
+  },
+  {
+    "version_id": 49,
+    "version": "핀란드 재난망 2월 Release",
+    "project": "Erillisverkot_LM75B",
+    "project_id": 111,
+    "source": "company",
+    "due_date": "2025-02-20",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/49"
+  },
+  {
+    "version_id": 56,
+    "version": "[재난망][LM75][DMR] QA검증",
+    "project": "MCPTT",
+    "project_id": 147,
+    "source": "company",
+    "due_date": "2025-03-14",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/56"
+  },
+  {
+    "version_id": 43,
+    "version": "[재난망][LM75][MCPTT] QA검증",
+    "project": "MCPTT",
+    "project_id": 147,
+    "source": "company",
+    "due_date": "2025-03-14",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/43"
+  },
+  {
+    "version_id": 59,
+    "version": "450Connect_Drop14(2025-03-14)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2025-03-14",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/59"
+  },
+  {
+    "version_id": 58,
+    "version": "핀란드재난망 3월 Field Test 릴리즈",
+    "project": "Erillisverkot_LM75B",
+    "project_id": 111,
+    "source": "company",
+    "due_date": "2025-03-27",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/58"
+  },
+  {
+    "version_id": 71,
+    "version": "스웨덴 MSB (2025-04-11, 금)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2025-04-11",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/71"
+  },
+  {
+    "version_id": 70,
+    "version": "4월 업데이트 릴리즈",
+    "project": "Erillisverkot_LM75B",
+    "project_id": 111,
+    "source": "company",
+    "due_date": "2025-04-22",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/70"
+  },
+  {
+    "version_id": 51,
+    "version": "FOTA 5월 버전",
+    "project": "재난안전통신망",
+    "project_id": 80,
+    "source": "company",
+    "due_date": "2025-05-07",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/51"
+  },
+  {
+    "version_id": 82,
+    "version": "[재난망][육군KCMVP] QA 검증 (2025-05-28)",
+    "project": "MCPTT",
+    "project_id": 147,
+    "source": "company",
+    "due_date": "2025-05-28",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/82"
+  },
+  {
+    "version_id": 54,
+    "version": "LM75 KT QAT SAT 입고 버전 릴리즈",
+    "project": "LM75 재난망 (A, D) ",
+    "project_id": 170,
+    "source": "company",
+    "due_date": "2025-07-25",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/54"
+  },
+  {
+    "version_id": 153,
+    "version": "2025년 FOTA (2025-08-01) - JH01",
+    "project": "재난안전통신망",
+    "project_id": 80,
+    "source": "company",
+    "due_date": "2025-08-01",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/153"
+  },
+  {
+    "version_id": 97,
+    "version": "PTA_FAT_Drop8",
+    "project": "PTA",
+    "project_id": 38,
+    "source": "company",
+    "due_date": "2025-08-29",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/97"
+  },
+  {
+    "version_id": 99,
+    "version": "PTA_FAT_Drop8",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2025-09-25",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/99"
+  },
+  {
+    "version_id": 152,
+    "version": "2025년 FOTA - JH01",
+    "project": "재난안전통신망",
+    "project_id": 80,
+    "source": "company",
+    "due_date": "2025-10-28",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/152"
+  },
+  {
+    "version_id": 109,
+    "version": "450Connect (2025-11-24)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2025-11-25",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/109"
+  },
+  {
+    "version_id": 108,
+    "version": "Tel Aviv (2025-11-25)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2025-11-25",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/108"
+  },
+  {
+    "version_id": 110,
+    "version": "NCRTC (2025-11-24)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2025-11-28",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/110"
+  },
+  {
+    "version_id": 115,
+    "version": "Cellnex POC 버전 (2025-12-19)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2025-12-19",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/115"
+  },
+  {
+    "version_id": 107,
+    "version": "[재난망][육군KCMVP] QA 검증 (2025년 12월)",
+    "project": "MCPTT",
+    "project_id": 147,
+    "source": "company",
+    "due_date": "2025-12-31",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/107"
+  },
+  {
+    "version_id": 117,
+    "version": "Drop17 릴리즈(2026/1/8)",
+    "project": "450 Connect",
+    "project_id": 17,
+    "source": "company",
+    "due_date": "2026-01-08",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/117"
+  },
+  {
+    "version_id": 105,
+    "version": "[재난망][육군KCMVP] C4I 기능 추가 버전 (2026-01-21)",
+    "project": "MCPTT",
+    "project_id": 147,
+    "source": "company",
+    "due_date": "2026-01-21",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/105"
+  },
+  {
+    "version_id": 120,
+    "version": "PTA Drpo9 (2026-01-28)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2026-01-28",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/120"
+  },
+  {
+    "version_id": 121,
+    "version": "CTB POC (2026-01-30)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2026-01-30",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/121"
+  },
+  {
+    "version_id": 111,
+    "version": "PTA_FAT_Drop9",
+    "project": "PTA",
+    "project_id": 38,
+    "source": "company",
+    "due_date": "2026-01-30",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/111"
+  },
+  {
+    "version_id": 124,
+    "version": "CTB POC (3월 배포)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2026-02-27",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/124"
+  },
+  {
+    "version_id": 123,
+    "version": "LM84 핀란드재난망 Virve day 데모",
+    "project": "LM84 Project",
+    "project_id": 259,
+    "source": "company",
+    "due_date": "2026-03-27",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/123"
+  },
+  {
+    "version_id": 128,
+    "version": "Drop18 릴리즈(2026/3/30)",
+    "project": "450 Connect",
+    "project_id": 17,
+    "source": "company",
+    "due_date": "2026-03-30",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/128"
+  },
+  {
+    "version_id": 127,
+    "version": "CTB POC (4월 30일)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2026-04-30",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/127"
+  },
+  {
+    "version_id": 130,
+    "version": "[재난망][LM75] QAT/SAT 검증 버전 (2026-06-26)",
+    "project": "MCPTT",
+    "project_id": 147,
+    "source": "company",
+    "due_date": "2026-06-26",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/130"
+  },
+  {
+    "version_id": 136,
+    "version": "Drop19 릴리즈(2026/6/30)",
+    "project": "450 Connect",
+    "project_id": 17,
+    "source": "company",
+    "due_date": "2026-06-30",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/136"
+  },
+  {
+    "version_id": 137,
+    "version": "Drop19 릴리즈(2026/6/30)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2026-06-30",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/137"
+  },
+  {
+    "version_id": 141,
+    "version": "PTA Drop10 (26-07-10)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2026-07-10",
+    "status": "closed",
+    "url": "http://10.1.100.150/redmine/versions/141"
+  },
+  {
+    "version_id": 142,
+    "version": "CTB POC (2026-07-16)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2026-07-16",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/142"
+  },
+  {
+    "version_id": 151,
+    "version": "2026년 FOTA 버전 (2026-08)",
+    "project": "재난안전통신망",
+    "project_id": 80,
+    "source": "company",
+    "due_date": "2026-08-15",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/151"
+  },
+  {
+    "version_id": 158,
+    "version": "[CTB POC] 헝가리국방부 HMEI",
+    "project": "CTB 공통 패키지",
+    "project_id": 121,
+    "source": "company",
+    "due_date": "2026-08-18",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/158"
+  },
+  {
+    "version_id": 157,
+    "version": "[CTB POC] 헝가리국방부 HMEI",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2026-08-18",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/157"
+  },
+  {
+    "version_id": 161,
+    "version": "재난망 LM75 SAT2차&NIA1차",
+    "project": "DMR/CPS",
+    "project_id": 301,
+    "source": "company",
+    "due_date": "2026-08-26",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/161"
+  },
+  {
+    "version_id": 155,
+    "version": "LM75 - 2026년 버전 (2026-08)",
+    "project": "LM75 재난망 (A, D) ",
+    "project_id": 170,
+    "source": "company",
+    "due_date": "2026-08-27",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/155"
+  },
+  {
+    "version_id": 150,
+    "version": "MCPTT - [재난망][LM75][SAT] SAT1차 이슈 수정 버전",
+    "project": "MCPTT",
+    "project_id": 147,
+    "source": "company",
+    "due_date": "2026-08-27",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/150"
+  },
+  {
+    "version_id": 160,
+    "version": "Drop20 릴리즈(2026/8/31)",
+    "project": "450 Connect",
+    "project_id": 17,
+    "source": "company",
+    "due_date": "2026-08-31",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/160"
+  },
+  {
+    "version_id": 159,
+    "version": "Drop20 릴리즈(2026-08-31)",
+    "project": "Nokia 프로젝트",
+    "project_id": 146,
+    "source": "company",
+    "due_date": "2026-08-31",
+    "status": "open",
+    "url": "http://10.1.100.150/redmine/versions/159"
+  }
+]

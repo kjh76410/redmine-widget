@@ -9,6 +9,14 @@ let versionGroups = [];
 let yearFilter = null;  // null=전체, 그 외엔 연도(숫자) 또는 "none"(종료일 없는 버전)
 let loadToken = 0;
 
+// 새로고침 아이콘 - 지금 고른 프로젝트를 캐시 없이 곧바로 다시 받아온다. 아직 고른
+// 프로젝트가 없으면(selectedProjectId 없음) 할 일이 없으니 조용히 무시한다.
+document.getElementById("refreshBtn").addEventListener("click", () => {
+    if (selectedProjectId != null) {
+        window.pywebview.api.refresh_resolved_by_version(selectedProjectId);
+    }
+});
+
 // 프로젝트를 고를 때마다 연도 필터 기본값 - "지금 당장 뭐가 나가는지"가 제일 궁금한
 // 화면이라, 처음엔 항상 올해 배지가 눌린 상태로 시작한다(전체를 보려면 눌러서 끄면 됨).
 function currentYear() {
@@ -189,9 +197,9 @@ function renderVersionCol() {
 
 // 하위 프로젝트마다 섹션을 나눠서 그 프로젝트의 버전들을 묶어 보여준다(각 섹션 안
 // 순서는 위에서 이미 정렬해 둔 종료일 내림차순 그대로). 섹션 순서는 프로젝트 이름
-// 가나다순 - 여러 프로젝트를 한꺼번에 조회하는 순서(스레드가 끝나는 순서)는 매번
-// 달라져서, 이름순으로 고정해야 다시 그릴 때마다(연도 필터를 바꿀 때 등) 섹션
-// 위치가 안 흔들린다.
+// 가나다 역순(내림차순) - 여러 프로젝트를 한꺼번에 조회하는 순서(스레드가 끝나는
+// 순서)는 매번 달라져서, 이름순으로 고정해야 다시 그릴 때마다(연도 필터를 바꿀 때
+// 등) 섹션 위치가 안 흔들린다.
 function renderVersionsGroupedByProject(col, groups) {
     const byProject = new Map();
     groups.forEach((g) => {
@@ -200,7 +208,7 @@ function renderVersionsGroupedByProject(col, groups) {
         byProject.get(key).push(g);
     });
 
-    [...byProject.keys()].sort((a, b) => a.localeCompare(b, "ko")).forEach((project, i) => {
+    [...byProject.keys()].sort((a, b) => b.localeCompare(a, "ko")).forEach((project, i) => {
         const section = document.createElement("div");
         section.className = "project-section" + (i > 0 ? " with-divider" : "");
 
@@ -243,24 +251,21 @@ function renderVersionRow(group) {
     // 연도 배지로 필터를 바꾸면 목록 전체가 다시 그려지는데, 그때도 이미 골라 둔
     // 버전의 선택 표시가 살아있게 group 참조(selectedVersionGroup)로 비교한다 -
     // DOM 요소(selectedVersionRow)는 다시 그릴 때마다 새로 만들어져 못 미덥다.
-    row.className = "row" + (group === selectedVersionGroup ? " selected" : "");
+    row.className = "row version-row" + (group === selectedVersionGroup ? " selected" : "");
     if (group === selectedVersionGroup) selectedVersionRow = row;
 
-    // 종료일은 버전명 앞에 - 목록을 세로로 훑을 때 날짜가 한 줄로 정렬돼서
-    // "언제까지인지"가 먼저 읽힌다. 종료일이 없는 버전도 빈 자리를 남겨서
-    // (.due.none) 버전명 시작 위치는 모든 행이 같게 맞춘다.
+    // 날짜를 요일까지 다 쓰는 형식(YYYY-MM-DD (요일))으로 바꾸면서 한 줄에 버전명까지
+    // 넣기엔 좁아졌다 - 위 줄엔 종료일 + 진행률, 아래 줄엔 버전명(제목)으로 나눈다
+    // (.version-row 참고). 종료일이 없는 버전도 빈 자리를 남겨서(.due.none) 진행률
+    // 뱃지 위치가 모든 행이 같게 맞춘다.
+    const top = document.createElement("div");
+    top.className = "row-top";
     const due = document.createElement("span");
     due.className = group.due_date ? "due" : "due none";
     if (group.due_date) {
         due.textContent = formatDue(group.due_date);
-        due.title = `종료일 ${group.due_date}`;
     }
-    row.appendChild(due);
-
-    const label = document.createElement("span");
-    label.className = "label";
-    label.textContent = group.version;
-    row.appendChild(label);
+    top.appendChild(due);
 
     // 뱃지엔 진행률 퍼센트만 - 몇 건 중 몇 건인지는 툴팁으로 미룬다. 끝난 일감
     // 판정은 closed_on 기준이다(redmine_api.fetch_issues_by_version 참고).
@@ -271,7 +276,13 @@ function renderVersionRow(group) {
     count.className = "count" + (total > 0 && done === total ? " done" : "");
     count.textContent = `${percent}%`;
     count.title = `전체 ${total}건 중 ${done}건 완료 (${percent}%)`;
-    row.appendChild(count);
+    top.appendChild(count);
+    row.appendChild(top);
+
+    const label = document.createElement("div");
+    label.className = "label";
+    label.textContent = group.version;
+    row.appendChild(label);
 
     row.addEventListener("click", () => {
         if (selectedVersionRow) selectedVersionRow.classList.remove("selected");
@@ -284,11 +295,15 @@ function renderVersionRow(group) {
     return row;
 }
 
-// "2026-05-31" -> "26.05.31". 가운데 칸이 좁아서(창 너비의 30%) 연도 네 자리를 다
-// 쓰면 버전명이 밀린다 - 뱃지에 마우스를 올리면 원래 날짜가 그대로 보인다.
+const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
+
+// "2026-05-31" -> "2026-05-31 (토)". new Date()가 로컬 자정으로 파싱하게 시각까지
+// 붙여서 만든다("2026-05-31"만 주면 UTC 자정으로 해석돼 시간대에 따라 하루 밀릴 수 있다).
 function formatDue(dueDate) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dueDate);
-    return m ? `${m[1].slice(2)}.${m[2]}.${m[3]}` : dueDate;
+    if (!m) return dueDate;
+    const weekday = WEEKDAY_KO[new Date(`${dueDate}T00:00:00`).getDay()];
+    return `${dueDate} (${weekday})`;
 }
 
 function renderIssueCol(group) {
